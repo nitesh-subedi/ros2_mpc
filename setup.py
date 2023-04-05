@@ -15,9 +15,8 @@ setup(
     zip_safe=True,
     maintainer='nitesh22',
     maintainer_email='subedinitesh43@gmail.com',
-    description='TODO: Package description',
-    license='TODO: License declaration',
-    tests_require=['pytest'],
+    description='MPC local planner for ROS 2 Navigation',
+    license='MIT',
     entry_points={
         'console_scripts': [
         ],

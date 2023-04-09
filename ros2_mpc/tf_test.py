@@ -35,6 +35,10 @@ class RobotPositionSubscriber(Node):
                     self.robot_position = self.map_to_odom + self.odom_to_base_footprint
                     self.get_logger().info(
                         "Robot position on map: x = %f, y = %f" % (self.robot_position[0], self.robot_position[1]))
+    
+    def get_robot_position(self):
+        rclpy.spin_once(self)
+        return self.robot_position
 
 
 def main(args=None):

@@ -2,10 +2,10 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>ros2_mpc</name>
-  <version>0.0.0</version>
-  <description>TODO: Package description</description>
+  <version>0.0.1</version>
+  <description>MPC local planner for ROS 2 Navigation</description>
   <maintainer email="subedinitesh43@gmail.com">nitesh22</maintainer>
-  <license>TODO: License declaration</license>
+  <license>MIT</license>
 
   <export>
     <build_type>ament_python</build_type>

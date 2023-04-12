@@ -24,7 +24,7 @@ def inflate_global(occupancy_grid, inflation_matrix, cells_inflation):
 def inflate_local(occupancy_grid, inflation_matrix, cells_inflation, robot_position, costmap_size):
     # Extract the occupancy grid around the robot position with the size of the costmap
     occupancy_grid = occupancy_grid[int(robot_position[1] - costmap_size / 2):int(robot_position[1] + costmap_size / 2),
-                    int(robot_position[0] - costmap_size / 2):int(robot_position[0] + costmap_size / 2)]
+                     int(robot_position[0] - costmap_size / 2):int(robot_position[0] + costmap_size / 2)]
     new_grid = occupancy_grid.copy()
     for i in range(occupancy_grid.shape[0]):
         for j in range(occupancy_grid.shape[1]):
@@ -34,7 +34,7 @@ def inflate_local(occupancy_grid, inflation_matrix, cells_inflation, robot_posit
                                                     j + cells_inflation + 1)].shape != inflation_matrix.shape:
                     continue
                 new_grid[max(0, i - cells_inflation):min(occupancy_grid.shape[0], i + cells_inflation + 1), max(
-                    0, j - cells_inflation):min(occupancy_grid.shape[1], j + cells_inflation + 1)] = np.minimum(
+                    0, j - cells_inflation):min(occupancy_grid.shape[1], j + cells_inflation + 1)] = np.maximum(
                     new_grid[max(0, i - cells_inflation):min(occupancy_grid.shape[0], i + cells_inflation + 1), max(
                         0, j - cells_inflation):min(occupancy_grid.shape[1], j + cells_inflation + 1)],
                     inflation_matrix)

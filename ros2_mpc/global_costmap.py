@@ -30,7 +30,7 @@ def main():
     inflation_matrix = 1 - ((get_inflation_matrix(cells_inflation)) / 100)
     # Invert the matrix so that the center cell is 0 and the outer cells are 1
     new_grid = inflate_global(occupancy_grid, new_grid,
-                       inflation_matrix, cells_inflation)
+                              inflation_matrix, cells_inflation)
     cv2.imshow('Inflated map', new_grid)
     cv2.waitKey(0)
 

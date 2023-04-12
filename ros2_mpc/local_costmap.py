@@ -8,8 +8,29 @@ import rclpy
 from rclpy.node import Node
 import tf2_ros
 from tf2_msgs.msg import TFMessage
-from matplotlib import pyplot as plt
+# from matplotlib import pyplot as plt
 from nav_msgs.msg import OccupancyGrid
+from numba import njit
+
+
+class MapSubscriber(Node):
+    def __init__(self):
+        super().__init__("map_subscriber")
+        self.map = None
+        self.map_info = None
+        self.map_subscriber = self.create_subscription(OccupancyGrid, '/map', self.map_callback, 10)
+
+    def map_callback(self, msg):
+        map_origin = msg.info.origin.position
+        map_resolution = msg.info.resolution
+        self.map_info = {'resolution': map_resolution, 'origin': map_origin}
+        height = msg.info.height
+        width = msg.info.width
+        self.map = np.array(msg.data).reshape((height, width))
+
+    def get_map(self):
+        rclpy.spin_once(self)
+        return self.map, self.map_info
 
 
 class RobotPositionSubscriber(Node):
@@ -29,107 +50,119 @@ class RobotPositionSubscriber(Node):
             for transform in data.transforms:
                 if transform.child_frame_id == "odom" and transform.header.frame_id == "map":
                     self.map_to_odom = np.array([transform.transform.translation.x, transform.transform.translation.y])
-                    # self.get_logger().info("Odom to map: x = %f, y = %f" % (transform.transform.translation.x,
-                    # transform.transform.translation.y))
                 if transform.child_frame_id == "base_footprint" and transform.header.frame_id == "odom":
                     self.odom_to_base_footprint = np.array(
                         [transform.transform.translation.x, transform.transform.translation.y])
-                    # self.get_logger().info("Base footprint to odom: x = %f, y = %f" % (
-                    # transform.transform.translation.x, transform.transform.translation.y))
                 if self.map_to_odom is not None and self.odom_to_base_footprint is not None:
                     self.robot_position = self.map_to_odom + self.odom_to_base_footprint
                     self.get_logger().info(
                         "Robot position on map: x = %f, y = %f" % (self.robot_position[0], self.robot_position[1]))
-    
+
     def get_robot_position(self):
-        self.get_logger().info("Waiting for robot position...")
         rclpy.spin_once(self)
         time.sleep(0.1)
         return self.robot_position
 
 
-class Costmap_publisher(Node):
+class CostmapPublisher(Node):
     def __init__(self):
         super().__init__("costmap_publisher")
         self.publisher = self.create_publisher(OccupancyGrid, "/my_local_costmap", 10)
         self.msg = OccupancyGrid()
-    
-    def publish_costmap(self, costmap, costmap_size):
+
+    def publish_costmap(self, costmap, costmap_size, robot_pos):
         self.msg.header.stamp = self.get_clock().now().to_msg()
         self.msg.header.frame_id = "map"
         self.msg.info.width = costmap.shape[1]
         self.msg.info.height = costmap.shape[0]
-        # self.msg.info.origin.position.x = (-costmap_size / 2) * 0.05
-        # self.msg.info.origin.position.y = (-costmap_size / 2) * 0.05
+        self.msg.info.origin.position.x = robot_pos[0] + (-costmap_size / 2) * 0.05
+        self.msg.info.origin.position.y = robot_pos[1] + (-costmap_size / 2) * 0.05
         self.msg.info.resolution = 0.05
         self.msg.data = costmap.flatten().tolist()
         self.publisher.publish(self.msg)
+        self.get_logger().info("Costmap Published!")
+
+
+# @njit
+def get_grid(data):
+    M = 65
+    N = 50
+    height = data.shape[0]
+    width = data.shape[1]
+    # data = list(data)
+    for y in range(width):
+        for x in range(height):
+            if data[x, y] >= M:
+                data[x, y] = 100
+            elif data[x, y] < N:
+                data[x, y] = 0
+
+    return data
+
 
 def main(args=None):
     rclpy.init(args=args)
-    node = RobotPositionSubscriber()
-    costmap_publisher = Costmap_publisher()
-
-    map_path = os.path.join(current_path, 'maps', 'map_carto.pgm')
-    yaml_path = os.path.join(current_path, 'maps', 'map_carto.yaml')
-    # Load map
-    img = cv2.imread(map_path, cv2.IMREAD_GRAYSCALE)
-
-    # Load map.yaml file
-    with open(yaml_path, 'r') as file:
-        params = yaml.safe_load(file)
-
-    resolution = params['resolution']
-    occupancy_thresh = params['occupied_thresh']
-    origin = -np.array(params['origin']) / resolution
-    inflation = 0.22  # in meters
-    cells_inflation = int(inflation / resolution)
-    size = 3  # in meters
-    costmap_size = int(size / resolution)
-    # Threshold the image into a binary image
-    ret, binary = cv2.threshold(img, occupancy_thresh, 255, cv2.THRESH_BINARY)
-
-    # Convert to occupancy grid
-    occupancy_grid = np.zeros((img.shape[0], img.shape[1]))
-    occupancy_grid[binary == 255] = 100
-
-    # Display a red circle in the center of the map
-    map_origin = np.array([origin[0], occupancy_grid.shape[0] - origin[1]])
-
+    robot = RobotPositionSubscriber()
+    costmap_publisher = CostmapPublisher()
+    map_subscriber = MapSubscriber()
+    occupancy_thresh = 65
+    inflation = 0.1  # in meters
+    costmap_m_size = 2  # in meters
 
     while rclpy.ok():
-        # time.sleep(0.1)
+        # time.sleep(2)
         # Get the robot position
-        robot_position = node.get_robot_position()
-        while robot_position is None:    
-            robot_position = node.get_robot_position()
-            print("Robot position is None!")
+        robot_position = robot.get_robot_position()
+        while robot_position is None:
+            robot_position = robot.get_robot_position()
             time.sleep(0.1)
+
+        # Get the map
+        map_image, map_info = map_subscriber.get_map()
+        resolution = map_info['resolution']
+        map_origin = map_info['origin']
+        costmap_size = int(costmap_m_size / resolution)
+        cells_inflation = int(inflation / resolution)
+        # map_image = map_image.astype(np.uint8)
+        # print("map shape: ", map_image.shape)
+        # occupancy_grid = map_image.copy()
+        # mask = map_image > 50
+        # occupancy_grid[mask] = 0
+        # mask = map_image < 25
+        # map_image[mask] = 100
+        # occupancy_grid = map_image
+        occupancy_grid = get_grid(map_image)
+        # ret, occupancy_grid = cv2.threshold(map_image, occupancy_thresh, 100, cv2.THRESH_BINARY)
+        # cv2.imwrite('occ.png', occupancy_grid)
+        # pass
+        # occupancy_grid = np.zeros((map_image.shape[0], map_image.shape[1]))
+        # occupancy_grid[binary == 255] = 100
+
         rob_x = robot_position[0]  # in meters
         rob_y = robot_position[1]  # in meters
-        # rob_x = 0  # in meters
-        # rob_y = 0  # in meters
 
-        
-        robot_pos = np.array([map_origin[0] + int(rob_x / resolution),
-                            map_origin[1] - int(rob_y / resolution)])
+        robot_pos = np.array([-map_origin.x / resolution + int(rob_x / resolution),
+                              -map_origin.y / resolution + int(rob_y / resolution)])
         robot_position = tuple(robot_pos.astype(int))
-        inflation_matrix = 1 - ((get_inflation_matrix(cells_inflation, factor=1.5)) / 100)
+        inflation_matrix = get_inflation_matrix(cells_inflation, factor=1.3)
 
         # Inflate the map
-        local_costmap = inflate_local(occupancy_grid, inflation_matrix, cells_inflation, robot_position, costmap_size).astype(int)
+        local_costmap = inflate_local(occupancy_grid, inflation_matrix, cells_inflation, robot_position,
+                                      costmap_size).astype(np.uint8)
+        # # Flip the local costmap
+        # local_costmap = cv2.flip(local_costmap, 0)
+        # # Invert the values
+        local_costmap = 100 - local_costmap
         # print(local_costmap)
-        costmap_publisher.publish_costmap(local_costmap, costmap_size)
-        # print("Localcostmap published!")
-    #     plt.imshow(local_costmap)
-           
-
-    # plt.show()
-        # cv2.imshow('Local costmap', local_costmap)
-        # if cv2.waitKey(0) == ord('q'):
-        #     cv2.destroyAllWindows()
+        # if local_costmap is not None:
+        #     cv2.imshow('local_costmap', local_costmap)
+        #     if cv2.waitKey(0) & 0xFF == ord('q'):
+        #         break
+        robot_pos = np.array([rob_x, rob_y])
+        costmap_publisher.publish_costmap(local_costmap, costmap_size, robot_pos)
+        # cv2.imshow('local_costmap', local_costmap)
+        # if cv2.waitKey(0) & 0xFF == ord('q'):
         #     break
-            
 
 
 if __name__ == '__main__':

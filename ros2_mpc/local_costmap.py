@@ -106,7 +106,7 @@ def main(args=None):
     costmap_publisher = CostmapPublisher()
     map_subscriber = MapSubscriber()
     occupancy_thresh = 65
-    inflation = 0.1  # in meters
+    inflation = 0.2  # in meters
     costmap_m_size = 2  # in meters
 
     while rclpy.ok():
@@ -144,15 +144,15 @@ def main(args=None):
         robot_pos = np.array([-map_origin.x / resolution + int(rob_x / resolution),
                               -map_origin.y / resolution + int(rob_y / resolution)])
         robot_position = tuple(robot_pos.astype(int))
-        inflation_matrix = get_inflation_matrix(cells_inflation, factor=1.3)
+        inflation_matrix = get_inflation_matrix(cells_inflation, factor=2)
 
         # Inflate the map
         local_costmap = inflate_local(occupancy_grid, inflation_matrix, cells_inflation, robot_position,
-                                      costmap_size).astype(np.uint8)
+                                      costmap_size).astype(int)
         # # Flip the local costmap
         # local_costmap = cv2.flip(local_costmap, 0)
         # # Invert the values
-        local_costmap = 100 - local_costmap
+        # local_costmap = 100 - local_costmap
         # print(local_costmap)
         # if local_costmap is not None:
         #     cv2.imshow('local_costmap', local_costmap)

@@ -34,7 +34,7 @@ def inflate_local(occupancy_grid, inflation_matrix, cells_inflation, robot_posit
                                                     j + cells_inflation + 1)].shape != inflation_matrix.shape:
                     continue
                 new_grid[max(0, i - cells_inflation):min(occupancy_grid.shape[0], i + cells_inflation + 1), max(
-                    0, j - cells_inflation):min(occupancy_grid.shape[1], j + cells_inflation + 1)] = np.maximum(
+                    0, j - cells_inflation):min(occupancy_grid.shape[1], j + cells_inflation + 1)] = np.minimum(
                     new_grid[max(0, i - cells_inflation):min(occupancy_grid.shape[0], i + cells_inflation + 1), max(
                         0, j - cells_inflation):min(occupancy_grid.shape[1], j + cells_inflation + 1)],
                     inflation_matrix)

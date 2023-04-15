@@ -9,7 +9,7 @@ from rclpy.node import Node
 import tf2_ros
 from tf2_msgs.msg import TFMessage
 # from matplotlib import pyplot as plt
-from nav_msgs.msg import OccupancyGrid
+from nav_msgs.msg import OccupancyGrid, Odometry
 from numba import njit
 
 
@@ -31,6 +31,21 @@ class MapSubscriber(Node):
     def get_map(self):
         rclpy.spin_once(self)
         return self.map, self.map_info
+
+
+class OdomSubscriber(Node):
+    def __init__(self):
+        super().__init__("odom_subscriber")
+        self.robot_pos = None
+        self.odom_subscriber = self.create_subscription(Odometry, '/odom', self.odom_callback, 10)
+
+    def odom_callback(self, msg):
+        x_pos, y_pos = msg.pose.pose.position.x + 3.0, msg.pose.pose.position.y - 1.0
+        self.robot_pos = np.array([x_pos, y_pos])
+
+    def get_odom(self):
+        rclpy.spin_once(self)
+        return self.robot_pos
 
 
 class RobotPositionSubscriber(Node):
@@ -83,7 +98,7 @@ class CostmapPublisher(Node):
         self.get_logger().info("Costmap Published!")
 
 
-# @njit
+@njit
 def get_grid(data):
     M = 65
     N = 50
@@ -102,19 +117,19 @@ def get_grid(data):
 
 def main(args=None):
     rclpy.init(args=args)
-    robot = RobotPositionSubscriber()
+    robot = OdomSubscriber()
     costmap_publisher = CostmapPublisher()
     map_subscriber = MapSubscriber()
     occupancy_thresh = 65
-    inflation = 0.2  # in meters
+    inflation = 0.3  # in meters
     costmap_m_size = 2  # in meters
 
     while rclpy.ok():
         # time.sleep(2)
         # Get the robot position
-        robot_position = robot.get_robot_position()
+        robot_position = robot.get_odom()
         while robot_position is None:
-            robot_position = robot.get_robot_position()
+            robot_position = robot.get_odom()
             time.sleep(0.1)
 
         # Get the map

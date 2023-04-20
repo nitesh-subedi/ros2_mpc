@@ -4,7 +4,10 @@ import rclpy
 from rclpy.node import Node
 from numba import njit
 from sensor_msgs.msg import LaserScan
+from nav_msgs.msg import Odometry
+from geometry_msgs.msg import Twist
 import time
+import math
 
 
 def convert_laser_scan_to_occupancy_grid(laser_scan_data, angles, map_resolution, map_size):
@@ -67,13 +70,63 @@ def convert_to_map_coordinates(occ_grid, map_resolution=0.8):
     return meter_y, meter_x
 
 
+class OdomSubscriber(Node):
+    def __init__(self):
+        super().__init__('odom_subscriber')
+        self.orientation = None
+        self.position = None
+        self.odom_subscriber = self.create_subscription(Odometry, '/odom', self.odom_callback, 10)
+
+    def odom_callback(self, msg):
+        self.position = np.array([msg.pose.pose.position.x + 3.0, msg.pose.pose.position.y - 1.0])
+        self.orientation = np.array(euler_from_quaternion(
+            msg.pose.pose.orientation.x, msg.pose.pose.orientation.y, msg.pose.pose.orientation.z,
+            msg.pose.pose.orientation.w))
+        self.get_logger().info("Data received!")
+
+    def get_states(self):
+        rclpy.spin_once(self)
+        time.sleep(0.1)
+        return self.position, self.orientation
+
+
+class CmdVelPublisher(Node):
+    def __init__(self):
+        super().__init__('cmd_vel_publisher')
+        self.cmd_publisher = self.create_publisher(Twist, 'cmd_vel', 10)
+        self.pub = Twist()
+
+    def publish_cmd(self, v, w):
+        self.pub.linear.x = v
+        self.pub.angular.z = w
+        self.cmd_publisher.publish(self.pub)
+        self.get_logger().info("cmd published!")
+
+
+def euler_from_quaternion(x, y, z, w):
+    t0 = +2.0 * (w * x + y * z)
+    t1 = +1.0 - 2.0 * (x * x + y * y)
+    roll_x = math.atan2(t0, t1)
+
+    t2 = +2.0 * (w * y - z * x)
+    t2 = +1.0 if t2 > +1.0 else t2
+    t2 = -1.0 if t2 < -1.0 else t2
+    pitch_y = math.asin(t2)
+
+    t3 = +2.0 * (w * z + x * y)
+    t4 = +1.0 - 2.0 * (y * y + z * z)
+    yaw_z = math.atan2(t3, t4)
+
+    return roll_x, pitch_y, yaw_z  # in radians
+
+
 class OptiPlanner:
     def __init__(self, costmap_size, resolution):
         self.opti = casadi.Opti()
         self.N = 20
-        self.dt = 0.2
-        self.costmap_size = 2
-        self.resolution = 0.5
+        self.dt = 0.1
+        self.costmap_size = costmap_size
+        self.resolution = resolution
 
         # Define state variables
         self.x = self.opti.variable()
@@ -129,7 +182,7 @@ class OptiPlanner:
 
         self.opti.minimize(obj)
 
-        max_vel = 0.5
+        max_vel = 0.15
         self.opti.subject_to(self.U[0, :] <= max_vel)
         self.opti.subject_to(self.U[0, :] >= -max_vel)
 
@@ -138,18 +191,43 @@ class OptiPlanner:
         self.opti.subject_to(self.U[1, :] >= -max_ang)
 
         # Define obstacles
-        obstacles_x = self.opti.parameter(int((costmap_size * 2) / resolution), int((costmap_size * 2) / resolution))
-        obstacles_y = self.opti.parameter(int((costmap_size * 2) / resolution), int((costmap_size * 2) / resolution))
+        self.obstacles_x = self.opti.parameter(int((costmap_size * 2) / resolution) * 2)
+        self.obstacles_y = self.opti.parameter(int((costmap_size * 2) / resolution) * 2)
 
-        for i in range(obstacles_x.shape[0]):
-            for j in range(obstacles_x.shape[1]):
-                for k in range(self.N + 1):
-                    distance = np.sqrt((self.X[0, k] - obstacles_x[i, j]) ** 2 + (self.X[1, k] - obstacles_y[i, j]))
-                    self.opti.subject_to(distance > 0.3)
+        for i in range(self.obstacles_x.shape[0]):
+            for k in range(self.N + 1):
+                distance = np.sqrt(
+                    (self.X[0, k] - self.obstacles_x[i]) ** 2 + (self.X[1, k] - self.obstacles_y[i]) ** 2)
+                self.opti.subject_to(distance > 0.3)
+        # for k in range(self.N + 1):
+        #     distance = np.sqrt((self.X[0, k] - 1.6) ** 2 + (self.X[1, k] + 0.8) ** 2)
+        #     distance_2 = casadi.sqrt((self.X[0, k] - 0.8) ** 2 + (self.X[1, k] - 1.6) ** 2)
+        #     self.opti.subject_to(distance >= 0.2)
+        #     self.opti.subject_to(distance_2 >= 0.2)
 
         self.opti.solver('ipopt')
-        self.initial_state = casadi.vertcat(0, 0, 0)
-        self.final_state = casadi.vertcat(2, 0, 0)
+
+    def run(self, final_state, obstacles_x, obstacles_y, robot_pos, robot_ori):
+        u0 = np.zeros((self.n_controls, self.N))
+        pos = casadi.vertcat(robot_pos, robot_ori)
+        print(pos)
+        print(final_state)
+        self.opti.set_value(self.P, casadi.vertcat(pos, final_state))
+        self.opti.set_initial(self.U, u0)
+        self.opti.set_value(self.obstacles_x, obstacles_x)
+        self.opti.set_value(self.obstacles_y, obstacles_y)
+        self.opti.solve()
+        return self.opti.value(self.U[:, 0])
+
+
+@njit
+def rotate_coordinates(coordinates, rotation):
+    rot_matrix = np.array([[np.cos(rotation), -np.sin(rotation)],
+                           [np.sin(rotation), np.cos(rotation)]])
+
+    rotated = np.dot(rot_matrix, coordinates)
+
+    return rotated
 
 
 def main(args=None):
@@ -158,29 +236,43 @@ def main(args=None):
     resolution = 0.8
     size = 2
     planner = OptiPlanner(size, resolution)
+    odom_node = OdomSubscriber()
+    cmd_publisher = CmdVelPublisher()
+    final_pose = casadi.vertcat(7, -0.5, 0)
+    # u0 = np.zeros((planner.n_controls, planner.N))
+    obstacles_y = np.ones(int((size * 2) / resolution) * 2)
+    obstacles_x = np.ones(int((size * 2) / resolution) * 2)
     while rclpy.ok():
         scan_data, angles = laser_node.get_scan()
+        pos, ori = odom_node.get_states()
         if scan_data is None:
             continue
         occ_grid = 1 - convert_laser_scan_to_occupancy_grid(scan_data, angles, resolution, size * 2)
-        occ_grid = cv2.rotate(occ_grid, cv2.ROTATE_180)
-        tic = time.time()
+        occ_grid = np.rot90(occ_grid, k=2)
         x, y = convert_to_map_coordinates(occ_grid=occ_grid, map_resolution=resolution)
-        print(time.time() - tic)
         obstacles_indices = np.where(occ_grid == 0)
         obs_x, obs_y = x[obstacles_indices], y[obstacles_indices]
+        obstacle_array = np.array([obs_x, obs_y])
+        rotated_obstacle = rotate_coordinates(obstacle_array, ori[2])
+        rotated_obstacle[0, :] += pos[0]
+        rotated_obstacle[1, :] += pos[1]
 
-    # y_obs = np.array([-0.8, -1.6, 1.6, 0.8, -0.8, -0.8])
-    # x_obs = np.array([1.6, 1.6, 0.8, 0.8, 0.8, 0.0])
-    #
-    # x_obs_array = np.ones(obstacles_x.shape) * x_obs[0]
-    # x_obs_array = x_obs_array.ravel()
-    # x_obs_array[:len(x_obs)] = x_obs
-    # x_obs_array = np.reshape(x_obs_array, obstacles_x.shape)
-    # y_obs_array = np.ones(obstacles_y.shape) * y_obs[0]
-    # y_obs_array = y_obs_array.ravel()
-    # y_obs_array[:len(y_obs)] = y_obs
-    # y_obs_array = np.reshape(y_obs_array, obstacles_y.shape)
+        y_obs = rotated_obstacle[0, :]
+        x_obs = rotated_obstacle[1, :]
+
+        x_obs_array = obstacles_x * x_obs[0]
+        # x_obs_array = x_obs_array.ravel()
+        x_obs_array[:len(x_obs)] = x_obs
+        # x_obs_array = np.reshape(x_obs_array, obstacles_x.shape)
+        y_obs_array = obstacles_y * y_obs[0]
+        # y_obs_array = y_obs_array.ravel()
+        y_obs_array[:len(y_obs)] = y_obs
+        # y_obs_array = np.reshape(y_obs_array, obstacles_y.shape)
+        # print(x_obs_array, y_obs_array)
+
+        cmd = planner.run(final_pose, x_obs_array, y_obs_array, pos, ori[2])
+        print(cmd)
+        cmd_publisher.publish_cmd(cmd[0], cmd[1])
 
 
 if __name__ == '__main__':

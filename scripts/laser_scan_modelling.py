@@ -136,7 +136,7 @@ def rotate_image(img, angle):
 
     return rotated_img
 
-
+@njit
 def rotate_coordinates(coordinates, rotation):
     rot_matrix = np.array([[np.cos(rotation), -np.sin(rotation)],
                            [np.sin(rotation), np.cos(rotation)]])
@@ -159,7 +159,7 @@ def main(args=None):
         if scan_data is None:
             continue
         occ_grid = 1 - convert_laser_scan_to_occupancy_grid(scan_data, angles, resolution, size * 2)
-        occ_grid = cv2.rotate(occ_grid, cv2.ROTATE_180)
+        occ_grid = np.rot90(occ_grid, k=2)
         x, y = convert_to_map_coordinates(occ_grid=occ_grid, map_resolution=resolution)
         # print(time.time() - tic)
         obstacles_indices = np.where(occ_grid == 0)

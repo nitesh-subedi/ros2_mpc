@@ -1,7 +1,7 @@
 import casadi
 import numpy as np
 import matplotlib.pyplot as plt
-from ros2_mpc import mpc
+from ros2_mpc.mpc import Mpc
 
 
 def main():
@@ -14,7 +14,7 @@ def main():
     # Define final state
     xf = np.array([10, 10, 0])
     # Create an instance of the MPC class
-    mpc_planner = mpc.Mpc(dt, N)
+    mpc_planner = Mpc(dt, N)
     count = 0
     x_pos = []
     u0 = np.zeros((mpc_planner.n_controls, mpc_planner.N))

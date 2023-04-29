@@ -33,13 +33,6 @@ class Mpc:
         # Define solver
         self.opti.solver('ipopt')
 
-        # # Define initial state and final state
-        # self.opti.set_value(self.P[0:self.n_states], x0)
-        # self.opti.set_value(self.P[self.n_states:2 * self.n_states], xf)
-
-        # Define initial control
-        self.opti.set_initial(self.U, np.zeros((self.n_controls, self.N)))
-
     def perform_mpc(self, u0, initial_state=np.array([0, 0, 0]), final_state=np.array([10, 10, 0])):
         # Set initial state and parameter value
         self.opti.set_initial(self.U, u0)
@@ -134,7 +127,6 @@ class Mpc:
         rhs = casadi.vertcat(v * casadi.cos(theta), v * casadi.sin(theta), w)
         f = casadi.Function('f', [states, controls], [rhs], ['input_state', 'control_input'], ['rhs'])
         return f, n_states, n_controls
-
 
 # def main():
 #     # Define time step

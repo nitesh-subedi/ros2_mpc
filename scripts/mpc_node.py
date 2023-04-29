@@ -197,21 +197,20 @@ class OptiPlanner:
         self.opti.subject_to(self.U[1, :] >= -MAX_ANGULAR_VELOCITY)
 
         # Define obstacles
-        self.obstacles_x = self.opti.parameter(int((costmap_size * 2) / resolution) * 2)
-        self.obstacles_y = self.opti.parameter(int((costmap_size * 2) / resolution) * 2)
+        # self.obstacles_x = self.opti.parameter(int((costmap_size * 2) / resolution) * 2)
+        # self.obstacles_y = self.opti.parameter(int((costmap_size * 2) / resolution) * 2)
         #
-        for i in range(self.obstacles_x.shape[0]):
-            for k in range(self.N + 1):
-                distance = np.sqrt(
-                    (self.X[0, k] - self.obstacles_x[i]) ** 2 + (self.X[1, k] - self.obstacles_y[i]) ** 2)
-                self.opti.subject_to(distance > 0.3)
-        # for k in range(self.N + 1):
-        #     # distance = np.sqrt((self.X[0, k] - 1.6) ** 2 + (self.X[1, k] + 0.8) ** 2)
-        #     distance_2 = casadi.sqrt((self.X[0, k] - 2.5) ** 2 + (self.X[1, k] - 2.5) ** 2)
-        #     # self.opti.subject_to(distance >= 0.2)
-        #     self.opti.subject_to(distance_2 >= 0.5)
-        # opts = {}
-        # opts['ipopt.print_level'] = 0
+        # for i in range(self.obstacles_x.shape[0]):
+        #     for k in range(self.N + 1):
+        #         distance = np.sqrt(
+        #             (self.X[0, k] - self.obstacles_x[i]) ** 2 + (self.X[1, k] - self.obstacles_y[i]) ** 2)
+        #         self.opti.subject_to(distance > 0.3)
+        for k in range(self.N + 1):
+            # distance = np.sqrt((self.X[0, k] - 1.6) ** 2 + (self.X[1, k] + 0.8) ** 2)
+            # distance_2 = casadi.sqrt((self.X[0, k] - 2.5) ** 2 + (self.X[1, k] - 0) ** 2)
+            # self.opti.subject_to(distance >= 0.2)
+            self.opti.subject_to(distance(self.X[0, k], 2.5, self.X[1, k], 0) >= 1.0)
+
         self.opti.solver('ipopt')
 
     def run(self, final_state, robot_pos, robot_ori, obstacles_x, obstacles_y, u0):
@@ -221,10 +220,17 @@ class OptiPlanner:
         # print(final_state)
         self.opti.set_value(self.P, casadi.vertcat(pos, final_state))
         self.opti.set_initial(self.U, u0)
-        self.opti.set_value(self.obstacles_x, obstacles_x)
-        self.opti.set_value(self.obstacles_y, obstacles_y)
+        # self.opti.set_value(self.obstacles_x, obstacles_x)
+        # self.opti.set_value(self.obstacles_y, obstacles_y)
         self.opti.solve()
         return self.opti.value(self.U)
+
+
+def distance(x1, y1, x2, y2):
+    dx = x2 - x1
+    dy = y2 - y1
+    dist = casadi.sqrt(dx * dx + dy * dy)
+    return dist
 
 
 @njit
@@ -245,7 +251,7 @@ def main(args=None):
     planner = OptiPlanner(size, resolution)
     odom_node = OdomSubscriber()
     cmd_publisher = CmdVelPublisher()
-    final_pose = casadi.vertcat(5, 5, 0)
+    final_pose = casadi.vertcat(5, 0, 0)
     # u0 = np.zeros((planner.n_controls, planner.N))
     obstacles_y = np.ones(int((size * 2) / resolution) * 2)
     obstacles_x = np.ones(int((size * 2) / resolution) * 2)

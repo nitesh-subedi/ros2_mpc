@@ -77,50 +77,52 @@ def main():
     costmap_size = 2
     resolution = 0.5
     # Define initial state
-    x0 = np.array([0, 0, 0])
+    # x0 = np.array([0, 0, 0])
     # Define final state
     xf = np.array([5, 5, 0])
     # Create an instance of the MPC class
-    mpc_planner = Mpc(dt, N, cost_factor=1.0, costmap_size=costmap_size, resolution=resolution)
+    mpc_planner = Mpc(dt, N, cost_factor=0.01, costmap_size=costmap_size, resolution=resolution)
     x_pos = []
     u0 = np.zeros((mpc_planner.n_controls, mpc_planner.N))
-    obstacles_x = np.ones(int((costmap_size * 2) / resolution) * 2) * 100
-    obstacles_y = np.ones(int((costmap_size * 2) / resolution) * 2) * 100
+    obstacles_x = np.ones(int((costmap_size * 2) / resolution) * 2) * 2.5
+    obstacles_y = np.ones(int((costmap_size * 2) / resolution) * 2) * 2.5
     count = 0
+    pos, ori, velocity = odom_node.get_states()
+    x0 = casadi.vertcat(pos[0], pos[1], ori[2])
     while np.linalg.norm(x0 - xf) > 0.2 and count < 1000:
-        scan_data, angles = laser_node.get_scan()
+        # scan_data, angles = laser_node.get_scan()
         pos, ori, velocity = odom_node.get_states()
-        if scan_data is None:
-            continue
+        # if scan_data is None:
+        #     continue
 
-        occ_grid = 1 - convert_laser_scan_to_occupancy_grid(scan_data, angles, resolution, costmap_size * 2)
-        occ_grid = np.rot90(occ_grid, k=2)
-        x, y = convert_to_map_coordinates(occ_grid=occ_grid, map_resolution=resolution)
-        obstacles_indices = np.where(occ_grid == 0)
-        obs_x, obs_y = x[obstacles_indices], y[obstacles_indices]
-        obstacle_array = np.array([obs_x, obs_y])
-        rotated_obstacle = rotate_coordinates(obstacle_array, ori[2])
-        rotated_obstacle[0, :] += pos[0]
-        rotated_obstacle[1, :] += pos[1]
-
-        y_obs = rotated_obstacle[1, :]
-        x_obs = rotated_obstacle[0, :]
-        try:
-            x_obs_array = obstacles_x * x_obs[0]
-            # x_obs_array = x_obs_array.ravel()
-            x_obs_array[:len(x_obs)] = x_obs
-            # x_obs_array = np.reshape(x_obs_array, obstacles_x.shape)
-            y_obs_array = obstacles_y * y_obs[0]
-            # y_obs_array = y_obs_array.ravel()
-            y_obs_array[:len(y_obs)] = y_obs
-            # y_obs_array = np.reshape(y_obs_array, obstacles_y.shape)
-        except IndexError as e:
-            print(e, "No obstacles")
-            x_obs_array = obstacles_x
-            y_obs_array = obstacles_y
+        # occ_grid = 1 - convert_laser_scan_to_occupancy_grid(scan_data, angles, resolution, costmap_size * 2)
+        # occ_grid = np.rot90(occ_grid, k=2)
+        # x, y = convert_to_map_coordinates(occ_grid=occ_grid, map_resolution=resolution)
+        # obstacles_indices = np.where(occ_grid == 0)
+        # obs_x, obs_y = x[obstacles_indices], y[obstacles_indices]
+        # obstacle_array = np.array([obs_x, obs_y])
+        # rotated_obstacle = rotate_coordinates(obstacle_array, ori[2])
+        # rotated_obstacle[0, :] += pos[0]
+        # rotated_obstacle[1, :] += pos[1]
+        #
+        # y_obs = rotated_obstacle[1, :]
+        # x_obs = rotated_obstacle[0, :]
+        # try:
+        #     x_obs_array = obstacles_x * x_obs[0]
+        #     # x_obs_array = x_obs_array.ravel()
+        #     x_obs_array[:len(x_obs)] = x_obs
+        #     # x_obs_array = np.reshape(x_obs_array, obstacles_x.shape)
+        #     y_obs_array = obstacles_y * y_obs[0]
+        #     # y_obs_array = y_obs_array.ravel()
+        #     y_obs_array[:len(y_obs)] = y_obs
+        #     # y_obs_array = np.reshape(y_obs_array, obstacles_y.shape)
+        # except IndexError as e:
+        #     print(e, "No obstacles")
+        #     x_obs_array = obstacles_x
+        #     y_obs_array = obstacles_y
         x0 = casadi.vertcat(pos[0], pos[1], ori[2])
-        x, u = mpc_planner.perform_mpc(u0=u0, initial_state=x0, final_state=xf, obstacles_x=x_obs_array,
-                                       obstacles_y=y_obs_array)
+        x, u = mpc_planner.perform_mpc(u0=u0, initial_state=x0, final_state=xf, obstacles_x=obstacles_x,
+                                       obstacles_y=obstacles_x)
         # x0 = x[:, 1]
         u0 = np.concatenate((u[:, 1:], u[:, -1].reshape(2, 1)), axis=1)
         count += 1

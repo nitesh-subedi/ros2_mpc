@@ -2,6 +2,7 @@ import numpy as np
 from numba import njit
 
 
+@njit
 def convert_laser_scan_to_occupancy_grid(laser_scan_data, angles, map_resolution, map_size):
     # Calculate the size of each cell in the occupancy grid
     cell_size = map_resolution
@@ -15,18 +16,18 @@ def convert_laser_scan_to_occupancy_grid(laser_scan_data, angles, map_resolution
     occupancy_grid = np.zeros((num_cells, num_cells))
 
     # Convert laser scan data to Cartesian coordinates
-    angles = np.linspace(angle_min, angle_max, len(laser_scan_data))
+    angles = np.arange(len(laser_scan_data)) * (angle_max - angle_min) / len(laser_scan_data) + angle_min
     x_coords = laser_scan_data * np.cos(angles)
     y_coords = laser_scan_data * np.sin(angles)
 
-    # Convert Cartesian coordinates to occupancy grid indices
-    x_indices = np.array((x_coords + (map_size / 2)) / cell_size, dtype=int)
-    y_indices = np.array((y_coords + (map_size / 2)) / cell_size, dtype=int)
+    x_indices = (x_coords + (map_size / 2))
+    y_indices = (y_coords + (map_size / 2))
 
     # Set occupied cells in the occupancy grid
-    for x, y in zip(x_indices, y_indices):
+    for i in range(len(x_indices)):
+        x, y = x_indices[i], y_indices[i]
         if 0 <= x < num_cells and 0 <= y < num_cells:
-            occupancy_grid[x, y] = 1
+            occupancy_grid[int(x), int(y)] = 1
 
     return occupancy_grid
 

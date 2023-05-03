@@ -2,7 +2,7 @@ import numpy as np
 import cv2
 import yaml
 from numba import njit
-from ros2_mpc import get_inflation_matrix, inflate
+from ros2_mpc import get_inflation_matrix, inflate_local
 
 
 def main():
@@ -32,7 +32,7 @@ def main():
     # Invert the matrix so that the center cell is 0 and the outer cells are 1
     inflation_matrix = 1 - inflation_matrix
     print(inflation_matrix)
-    new_grid = inflate(occupancy_grid, new_grid,
+    new_grid = inflate_local(occupancy_grid, new_grid,
                        inflation_matrix, cells_inflation)
     cv2.imshow('Inflated map', new_grid)
     cv2.waitKey(0)

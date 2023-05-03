@@ -136,6 +136,7 @@ def rotate_image(img, angle):
 
     return rotated_img
 
+
 @njit
 def rotate_coordinates(coordinates, rotation):
     rot_matrix = np.array([[np.cos(rotation), -np.sin(rotation)],

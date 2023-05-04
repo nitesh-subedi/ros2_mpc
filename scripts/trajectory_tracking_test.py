@@ -1,6 +1,7 @@
 import rclpy
 from rclpy.node import Node
 from nav_msgs.msg import Odometry
+from geometry_msgs.msg import Twist
 from ros2_mpc.utils import euler_from_quaternion
 import time
 import casadi
@@ -33,8 +34,23 @@ class OdomSubscriber(Node):
         return self.position, self.orientation, self.velocities
 
 
+class CmdVelPublisher(Node):
+    def __init__(self):
+        super().__init__('cmd_vel_publisher')
+        self.cmd_publisher = self.create_publisher(Twist, 'cmd_vel', 10)
+        self.pub = Twist()
+
+    def publish_cmd(self, v, w):
+        self.pub.linear.x = v
+        self.pub.angular.z = w
+        self.cmd_publisher.publish(self.pub)
+        self.get_logger().info("cmd published!")
+
+
 def main():
     rclpy.init()
+    dt = 0.1
+    N = 20
     map_image = cv2.imread("/home/nitesh/workspaces/ros2_mpc_ws/src/ros2_mpc/maps/map_carto.pgm", cv2.IMREAD_GRAYSCALE)
     map_image[map_image == 0] = 1
     map_image[map_image > 1] = 0
@@ -45,65 +61,66 @@ def main():
     resolution = 0.05
     origin = np.array([-4.84, -6.61])
     odom_node = OdomSubscriber()
+    cmd_vel_publisher = CmdVelPublisher()
     # Get the current position of the robot
     pos, ori, velocity = odom_node.get_states()
-    robot_on_map = (np.array([pos[0], pos[1]]) - origin) / resolution
-    robot_on_map = tuple(robot_on_map.astype(int))
-    # Get the goal position
-    start_position = (robot_on_map[0], robot_on_map[1])
-    goal_position = (50, 175)
-    # Get the path
-    path = get_path(start_position, goal_position, map_image)
-    # Convert the path to world coordinates
-    path = np.array(path) * resolution + np.array([origin[1], origin[0]])
-    print(path)
-    # dt = 0.1
-    # N = 20
-    # mpc = Mpc(dt, N)
-    # # Define initial state
-    # x0 = np.array([0, 0, 0])
-    # # Define final state
-    # xf = np.array([1, 1, 0])
-    # # Define initial control
-    # u0 = np.zeros((mpc.n_controls, mpc.N))
-    # count = 0
-    # x_pos = []
-    # while count <= 300:
-    #     current_time = count * dt
-    #     pxf = np.array([])
-    #     puf = np.array([])
-    #     for k in range(mpc.N):
-    #         t_predict = current_time + k * dt
-    #         x_ref = 0.5 * t_predict * casadi.cos(np.deg2rad(45))
-    #         y_ref = 0.5 * t_predict * casadi.sin(np.deg2rad(45))
-    #         theta_ref = np.deg2rad(45)
-    #         u_ref = 0.25
-    #         omega_ref = 0
-    #         if np.linalg.norm(x0[0:2] - xf[0:2]) < 0.1:
-    #             x_ref = xf[0]
-    #             y_ref = xf[1]
-    #             u_ref = 0
-    #             omega_ref = 0
-    #         if k == 0:
-    #             pxf = casadi.vertcat(x_ref, y_ref, theta_ref)
-    #             puf = casadi.vertcat(u_ref, omega_ref)
-    #         else:
-    #             pxf = casadi.vertcat(pxf, casadi.vertcat(x_ref, y_ref, theta_ref))
-    #             puf = casadi.vertcat(puf, casadi.vertcat(u_ref, omega_ref))
-    #
-    #     x, u = mpc.perform_mpc(u0, x0, pxf, puf)
-    #     x0 = x
-    #     x_pos.append(x0)
-    #     count += 1
-    #     print(x0, xf)
-    #     print('u = ', u)
-    #     pass
-    #
-    # x_pos = np.array(x_pos)
-    # plt.plot(x_pos[:, 0], x_pos[:, 1])
-    # # Plot theta vs time
-    # # plt.plot(x_pos[:, 2])
-    # plt.show()
+    robot_on_map = ((np.array([pos[0], pos[1]]) - origin) / resolution).astype(np.int32)
+    # Change the origin from bottom left to top left
+    robot_on_map[1] = map_image.shape[0] - robot_on_map[1]
+    start = (robot_on_map[1], robot_on_map[0])
+    goal = (50, 175)
+    path = list(get_path(start, goal, map_image))
+    # Convert back to bottom left origin
+    path = np.array(path)
+    path = np.column_stack((path[:, 1], map_image.shape[0] - path[:, 0]))
+    # Convert back to world coordinates
+    path_xy = path * resolution + origin
+    # Compute the heading angle
+    path_heading = np.arctan2(path_xy[1:, 1] - path_xy[:-1, 1], path_xy[1:, 0] - path_xy[:-1, 0])
+    path_heading = np.append(path_heading, path_heading[-1])
+    # Compute the angular velocity
+    path_omega = path_heading[1:] - path_heading[:-1]
+    # Compute the velocity
+    path_velocity = (np.linalg.norm(path_xy[1:, :] - path_xy[:-1, :], axis=1) / dt) / 2
+    path_velocity = np.append(path_velocity, path_velocity[-1])
+    mpc = Mpc(dt, N)
+    # Define initial state
+    x0 = np.array([pos[0], pos[1], ori[2]])
+    # Define final state
+    xf = np.array([1, 1, 0])
+    # Define initial control
+    u0 = np.zeros((mpc.n_controls, mpc.N))
+    count = 0
+    x_pos = []
+    while count <= 200:
+        x_pos.append(x0)
+        # Get the nearest point on the path to the robot
+        nearest_point = np.argmin(np.linalg.norm(x0[0:2] - path_xy, axis=1))
+        # Get the reference trajectory
+        pxf = path_xy[nearest_point:nearest_point + mpc.N, :]
+        # Add the path_heading to pxf
+        pxf = np.column_stack((pxf, path_heading[nearest_point:nearest_point + mpc.N]))
+        # Flatten the array
+        pxf = pxf.flatten().reshape(-1, 1)
+        # Get the reference control
+        puf = np.column_stack(
+            (path_velocity[nearest_point:nearest_point + mpc.N], path_omega[nearest_point:nearest_point + mpc.N]))
+        puf = puf.flatten().reshape(-1, 1)
+        # Solve the optimization problem
+        x, u = mpc.perform_mpc(u0, x0, pxf, puf)
+        print("controls: ", u)
+        print("next state: ", pxf[0:3])
+        # Publish the control
+        cmd_vel_publisher.publish_cmd(u[0], u[1])
+        count += 1
+
+    cmd_vel_publisher.publish_cmd(0.0, 0.0)
+
+    x_pos = np.array(x_pos)
+    plt.plot(x_pos[:, 0], x_pos[:, 1])
+    # Plot theta vs time
+    # plt.plot(x_pos[:, 2])
+    plt.show()
 
 
 if __name__ == '__main__':

@@ -55,8 +55,7 @@ class Mpc:
         sol = self.opti.solve()
         # Extract optimal control
         u_opt = sol.value(self.U)
-        # x_opt = sol.value(self.X)
-        x_opt = x0 + self.f(x0, u_opt[:, 0]) * self.dt
+        x_opt = sol.value(self.X)
         return x_opt, u_opt[:, 0]
 
     # def obstacle_avoidance_constraints(self):

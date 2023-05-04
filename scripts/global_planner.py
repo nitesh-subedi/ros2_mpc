@@ -26,24 +26,25 @@ def get_path(start, goal, grid):
                            heuristic_cost_estimate_fnct=heuristic)
     return list(path)
 
-# def main():
-#     map_image = cv2.imread("/home/nitesh/workspaces/ros2_mpc_ws/src/ros2_mpc/maps/map_carto.pgm", cv2.IMREAD_GRAYSCALE)
-#     map_image[map_image == 0] = 1
-#     map_image[map_image > 1] = 0
-#     # Dilate the image by 10 pixels
-#     kernel = np.ones((10, 10), np.uint8)
-#     map_image = cv2.dilate(map_image, kernel, iterations=1)
-#     map_image = map_image.astype(np.uint8)
-#
-#     start = (50, 50)
-#     goal = (50, 175)
-#     path = list(get_path(start, goal, map_image))
-#     print(path)
-#
-#     plt.imshow(map_image, cmap="gray")
-#     plt.plot([x[1] for x in path], [x[0] for x in path])
-#     plt.show()
-#
-#
-# if __name__ == "__main__":
-#     main()
+
+def main():
+    map_image = cv2.imread("/home/nitesh/workspaces/ros2_mpc_ws/src/ros2_mpc/maps/map_carto.pgm", cv2.IMREAD_GRAYSCALE)
+    map_image[map_image == 0] = 1
+    map_image[map_image > 1] = 0
+    # Dilate the image by 10 pixels
+    kernel = np.ones((10, 10), np.uint8)
+    map_image = cv2.dilate(map_image, kernel, iterations=1)
+    map_image = map_image.astype(np.uint8)
+
+    start = (37, 125)
+    goal = (50, 175)
+    path = list(get_path(start, goal, map_image))
+    print(path)
+
+    plt.imshow(map_image, cmap="gray")
+    plt.plot([x[1] for x in path], [x[0] for x in path])
+    plt.show()
+
+
+if __name__ == "__main__":
+    main()

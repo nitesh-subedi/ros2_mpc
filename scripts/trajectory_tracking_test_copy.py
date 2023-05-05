@@ -97,7 +97,7 @@ def main():
     u0 = np.zeros((mpc.n_controls, mpc.N))
     count = 0
     x_pos = []
-    while np.linalg.norm(x0[0:2] - path_xy[-1, :]) > 0.1:
+    while np.linalg.norm(x0[0:2] - path_xy[-1, :]) > 0.5:
         x_pos.append(x0)
         # Get the nearest point on the path to the robot
         nearest_point = np.argmin(np.linalg.norm(x0[0:2] - path_xy, axis=1))
@@ -108,11 +108,11 @@ def main():
         if nearest_point + mpc.N > len(path_xy):
             # Fill the path_xy with repeated last element
             deficit = mpc.N - len(path_xy[nearest_point:])
-            path_xy = np.append(path_xy, np.transpose(np.repeat(path_xy[-1, :], deficit).reshape(2, -1)), axis=0)
+            path_xy = np.append(path_xy, np.repeat(path_xy[-1], deficit))
             # Fill the path_heading with repeated last element
             deficit = mpc.N - len(path_heading[nearest_point:])
             path_heading = np.append(path_heading, np.repeat(path_heading[-1], deficit))
-            pxf = path_xy[nearest_point:nearest_point + mpc.N, :]
+            pxf = path_xy[nearest_point:nearest_point + mpc.N]
             # Add the path_heading to pxf
             pxf = np.column_stack((pxf, path_heading[nearest_point:nearest_point + mpc.N]))
             # pxf = np.row_stack((x0, pxf))

@@ -69,9 +69,9 @@ def main():
     # Change the origin from bottom left to top left
     robot_on_map[1] = map_image.shape[0] - robot_on_map[1]
     start = (robot_on_map[1], robot_on_map[0])
-    goal = (2, -0.5)  # World coordinates
+    goal_xy = (4, 2)  # World coordinates
     # Convert goal to map coordinates
-    goal = ((goal - origin) / resolution).astype(np.int32)
+    goal = ((goal_xy - origin) / resolution).astype(np.int32)
     # Change the origin from bottom left to top left
     goal[1] = map_image.shape[0] - goal[1]
     # Swap the x and y coordinates
@@ -101,24 +101,30 @@ def main():
         x_pos.append(x0)
         # Get the nearest point on the path to the robot
         nearest_point = np.argmin(np.linalg.norm(x0[0:2] - path_xy, axis=1))
-        # Get the reference trajectory
-        pxf = path_xy[nearest_point:nearest_point + mpc.N, :]
-        # Add the path_heading to pxf
-        pxf = np.column_stack((pxf, path_heading[nearest_point:nearest_point + mpc.N]))
-        if nearest_point + mpc.N > len(path_xy):
-            # Fill the path_xy with repeated last element
-            deficit = mpc.N - len(path_xy[nearest_point:])
-            path_xy = np.append(path_xy, np.transpose(np.repeat(path_xy[-1, :], deficit).reshape(2, -1)), axis=0)
-            # Fill the path_heading with repeated last element
-            deficit = mpc.N - len(path_heading[nearest_point:])
-            path_heading = np.append(path_heading, np.repeat(path_heading[-1], deficit))
+        if np.linalg.norm(x0[0:2] - path_xy[-1, :]) < 0.5:
+            # Put all points of path to be the goal
+            goal_new = np.append(np.array(goal_xy), 0)
+            pxf = np.tile(goal_new, mpc.N).reshape(-1, 1)
+            print("Inside the circle")
+        else:
+            # Get the reference trajectory
             pxf = path_xy[nearest_point:nearest_point + mpc.N, :]
             # Add the path_heading to pxf
             pxf = np.column_stack((pxf, path_heading[nearest_point:nearest_point + mpc.N]))
-            # pxf = np.row_stack((x0, pxf))
+            if nearest_point + mpc.N > len(path_xy):
+                # Fill the path_xy with repeated last element
+                deficit = mpc.N - len(path_xy[nearest_point:])
+                path_xy = np.append(path_xy, np.transpose(np.repeat(path_xy[-1, :], deficit).reshape(2, -1)), axis=0)
+                # Fill the path_heading with repeated last element
+                deficit = mpc.N - len(path_heading[nearest_point:])
+                path_heading = np.append(path_heading, np.repeat(path_heading[-1], deficit))
+                pxf = path_xy[nearest_point:nearest_point + mpc.N, :]
+                # Add the path_heading to pxf
+                pxf = np.column_stack((pxf, path_heading[nearest_point:nearest_point + mpc.N]))
+                # pxf = np.row_stack((x0, pxf))
 
-        # Flatten the array
-        pxf = pxf.flatten().reshape(-1, 1)
+            # Flatten the array
+            pxf = pxf.flatten().reshape(-1, 1)
         # Get the reference control
 
         if len(path_velocity) != len(path_omega):

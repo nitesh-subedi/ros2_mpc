@@ -47,7 +47,7 @@ class CmdVelPublisher(Node):
 
 def main():
     rclpy.init()
-    dt = 0.1
+    dt = 0.2
     N = 20
     map_image = cv2.imread("/home/nitesh/workspaces/ros2_mpc_ws/src/ros2_mpc/maps/map_carto.pgm", cv2.IMREAD_GRAYSCALE)
     map_image[map_image == 0] = 1
@@ -69,7 +69,7 @@ def main():
     # Change the origin from bottom left to top left
     robot_on_map[1] = map_image.shape[0] - robot_on_map[1]
     start = (robot_on_map[1], robot_on_map[0])
-    goal_xy = (4, 2)  # World coordinates
+    goal_xy = (4.0, 2.0)  # World coordinates
     # Convert goal to map coordinates
     goal = ((goal_xy - origin) / resolution).astype(np.int32)
     # Change the origin from bottom left to top left
@@ -88,7 +88,7 @@ def main():
     # Compute the angular velocity
     path_omega = (path_heading[1:] - path_heading[:-1]) / 2
     # Compute the velocity
-    path_velocity = (np.linalg.norm(path_xy[1:, :] - path_xy[:-1, :], axis=1) / dt) / 2
+    path_velocity = (np.linalg.norm(path_xy[1:, :] - path_xy[:-1, :], axis=1) / dt) * 2
     path_velocity = np.append(path_velocity, path_velocity[-1])
     mpc = Mpc(dt, N)
     # Define initial state
@@ -97,7 +97,7 @@ def main():
     u0 = np.zeros((mpc.n_controls, mpc.N))
     count = 0
     x_pos = []
-    while np.linalg.norm(x0[0:2] - path_xy[-1, :]) > 0.1:
+    while np.linalg.norm(x0[0:2] - path_xy[-1, :]) > 0.25:
         x_pos.append(x0)
         # Get the nearest point on the path to the robot
         nearest_point = np.argmin(np.linalg.norm(x0[0:2] - path_xy, axis=1))

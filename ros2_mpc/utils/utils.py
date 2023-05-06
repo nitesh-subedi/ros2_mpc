@@ -75,7 +75,8 @@ def rotate_coordinates(coordinates, rotation):
 
 def world_to_map(world_x, world_y, map_image, map_info):
     map_coordinates = ((np.array([world_x, world_y]) - map_info['origin']) / map_info['resolution']).astype(np.int32)
-    return map_image.shape[0] - map_coordinates[1]
+    map_coordinates[1] = map_image.shape[0] - map_coordinates[1]
+    return map_coordinates
 
 
 def map_to_world(path, map_image, map_info):

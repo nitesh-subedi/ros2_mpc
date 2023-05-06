@@ -5,6 +5,7 @@ from ros2_mpc.planner.local_planner_tracking import Mpc
 from ros2_mpc.planner.global_planner import GlobalPlanner
 import cv2
 from ros2_mpc import utils
+import time
 
 
 def dilate_image(image, kernel_size):
@@ -83,40 +84,51 @@ def main():
     cmd_vel_publisher = CmdVelPublisher()
     planner = GlobalPlanner()
     mpc = Mpc(dt, N)
+    goal_xy = np.array([7.0, 0.0])
+    COMPUTE_PATH = True
+    planning_rate = 1
+    timer_period = 1.0 / planning_rate
+    tic = time.time()
+    while True:
+        map_image, map_info = map_node.get_map()
+        pos, ori, velocity = odom_node.get_states()
+        # Dilate the map image
+        map_image = dilate_image(map_image, 10)
+        # Get the current position of the robot
+        robot_on_map = utils.world_to_map(pos[0], pos[1], map_image, map_info)
+        start = (robot_on_map[1], robot_on_map[0])
+        # Get the goal position of the robot
 
-    map_image, map_info = map_node.get_map()
-    pos, ori, velocity = odom_node.get_states()
-    # Dilate the map image
-    map_image = dilate_image(map_image, 10)
-    # Get the current position of the robot
-    robot_on_map = utils.world_to_map(pos[0], pos[1], map_image, map_info)
-    start = (robot_on_map[1], robot_on_map[0])
-    # Get the goal position of the robot
-    goal_xy = np.array([4.0, 2.0])
-    goal_on_map = utils.world_to_map(goal_xy[0], goal_xy[1], map_image, map_info)
-    # Swap the x and y coordinates
-    goal = (goal_on_map[1], goal_on_map[0])
-    path = planner.get_path(start, goal, map_image)
-    # Convert the path to world coordinates
-    path_xy = utils.map_to_world(path, map_image, map_info)
-    # Compute the headings
-    path_heading, path_velocity, path_omega = get_headings(path_xy, dt)
-    # Define initial state
-    x0 = np.array([pos[0], pos[1], ori[2]])
-    # Define initial control
-    u0 = np.zeros((mpc.n_controls, mpc.N))
-    count = 0
-    x_pos = []
-    while np.linalg.norm(x0[0:2] - path_xy[-1, :]) > 0.15 and count <= 500:
-        x_pos.append(x0)
-        # Get the reference trajectory
-        pxf, puf = get_reference_trajectory(x0, goal_xy, path_xy, path_heading, path_velocity, path_omega, mpc)
+        goal_on_map = utils.world_to_map(goal_xy[0], goal_xy[1], map_image, map_info)
+        # Swap the x and y coordinates
+        goal = (goal_on_map[1], goal_on_map[0])
+
+        if time.time() - tic > timer_period:
+            tic = time.time()
+            COMPUTE_PATH = True
+
+        if COMPUTE_PATH:
+            path = planner.get_path(start, goal, map_image)
+            COMPUTE_PATH = False
+            # Convert the path to world coordinates
+            path_xy = utils.map_to_world(path, map_image, map_info)
+            # Compute the headings
+            path_heading, path_velocity, path_omega = get_headings(path_xy, dt)
+            # Define initial state
+            x0 = np.array([pos[0], pos[1], ori[2]])
+            # Define initial control
+            u0 = np.zeros((mpc.n_controls, mpc.N))
+            # Get the reference trajectory
+            pxf, puf = get_reference_trajectory(x0, goal_xy, path_xy, path_heading, path_velocity, path_omega, mpc)
+
+        tic = time.time()
+        # noinspection PyUnboundLocalVariable
         x, u = mpc.perform_mpc(u0, x0, pxf, puf)
+        print(time.time() - tic)
         # Publish the control
         cmd_vel_publisher.publish_cmd(u[0], u[1])
-        count += 1
-        pos, ori, velocity = odom_node.get_states()
-        x0 = np.array([pos[0], pos[1], ori[2]])
+        if np.linalg.norm(x0[0:2] - goal_xy) < 0.15:
+            break
 
     cmd_vel_publisher.publish_cmd(0.0, 0.0)
     print("Goal Reached!")

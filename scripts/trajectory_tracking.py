@@ -1,48 +1,9 @@
 import rclpy
-from rclpy.node import Node
-from nav_msgs.msg import Odometry
-from geometry_msgs.msg import Twist
-from ros2_mpc.utils import euler_from_quaternion
-import time
+from ros2_mpc.ros_topics import OdomSubscriber, CmdVelPublisher
 import numpy as np
-from ros2_mpc.mpc_trajectory import Mpc
-from global_planner import get_path
+from ros2_mpc.planner.local_planner_tracking import Mpc
+from ros2_mpc.planner.global_planner import GlobalPlanner
 import cv2
-
-
-class OdomSubscriber(Node):
-    def __init__(self):
-        super().__init__('odom_subscriber')
-        self.velocities = None
-        self.orientation = None
-        self.position = None
-        self.odom_subscriber = self.create_subscription(Odometry, '/odom', self.odom_callback, 10)
-
-    def odom_callback(self, msg):
-        self.position = np.array([msg.pose.pose.position.x + 3.0, msg.pose.pose.position.y - 1.0]).round(decimals=2)
-        self.orientation = np.array(euler_from_quaternion(
-            msg.pose.pose.orientation.x, msg.pose.pose.orientation.y, msg.pose.pose.orientation.z,
-            msg.pose.pose.orientation.w)).round(decimals=2)
-        self.velocities = np.array([msg.twist.twist.linear.x, msg.twist.twist.angular.z]).round(decimals=2)
-        self.get_logger().info("Data received!")
-
-    def get_states(self):
-        rclpy.spin_once(self)
-        time.sleep(0.1)
-        return self.position, self.orientation, self.velocities
-
-
-class CmdVelPublisher(Node):
-    def __init__(self):
-        super().__init__('cmd_vel_publisher')
-        self.cmd_publisher = self.create_publisher(Twist, 'cmd_vel', 10)
-        self.pub = Twist()
-
-    def publish_cmd(self, v, w):
-        self.pub.linear.x = v
-        self.pub.angular.z = w
-        self.cmd_publisher.publish(self.pub)
-        self.get_logger().info("cmd published!")
 
 
 def main():
@@ -52,11 +13,8 @@ def main():
     map_image = cv2.imread("/home/nitesh/workspaces/ros2_mpc_ws/src/ros2_mpc/maps/map_carto.pgm", cv2.IMREAD_GRAYSCALE)
     map_image[map_image == 0] = 1
     map_image[map_image > 1] = 0
-    # Dilate the image by 10 pixels
-    # kernel = np.ones((10, 10), np.uint8)
     kernel_size = 15
     kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (kernel_size, kernel_size))
-
     map_image = cv2.dilate(map_image, kernel, iterations=1)
     map_image = map_image.astype(np.uint8)
     resolution = 0.05
@@ -69,14 +27,15 @@ def main():
     # Change the origin from bottom left to top left
     robot_on_map[1] = map_image.shape[0] - robot_on_map[1]
     start = (robot_on_map[1], robot_on_map[0])
-    goal_xy = (4.0, 2.0)  # World coordinates
+    goal_xy = (3.0, -0.5)  # World coordinates
     # Convert goal to map coordinates
     goal = ((goal_xy - origin) / resolution).astype(np.int32)
     # Change the origin from bottom left to top left
     goal[1] = map_image.shape[0] - goal[1]
     # Swap the x and y coordinates
     goal = (goal[1], goal[0])
-    path = list(get_path(start, goal, map_image))
+    planner = GlobalPlanner(map_image)
+    path = planner.get_path(start, goal)
     # Convert back to bottom left origin
     path = np.array(path)
     path = np.column_stack((path[:, 1], map_image.shape[0] - path[:, 0]))

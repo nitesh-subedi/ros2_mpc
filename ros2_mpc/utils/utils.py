@@ -71,3 +71,16 @@ def rotate_coordinates(coordinates, rotation):
     rotated = np.dot(rot_matrix, coordinates)
 
     return rotated
+
+
+def world_to_map(world_x, world_y, map_image, map_info):
+    map_coordinates = ((np.array([world_x, world_y]) - map_info['origin']) / map_info['resolution']).astype(np.int32)
+    return map_image.shape[0] - map_coordinates[1]
+
+
+def map_to_world(path, map_image, map_info):
+    path = np.array(path)
+    path = np.column_stack((path[:, 1], map_image.shape[0] - path[:, 0]))
+    # Convert back to world coordinates
+    path_xy = path * map_info['resolution'] + map_info['origin']
+    return path_xy

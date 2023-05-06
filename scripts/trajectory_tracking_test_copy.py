@@ -5,8 +5,8 @@ from geometry_msgs.msg import Twist
 from ros2_mpc.utils import euler_from_quaternion
 import time
 import numpy as np
-from ros2_mpc.mpc_trajectory import Mpc
-from global_planner import get_path
+from ros2_mpc.planner.local_planner_tracking import Mpc
+from ros2_mpc.planner.global_planner import get_path
 import cv2
 
 

@@ -19,6 +19,7 @@ setup(
     license='MIT',
     entry_points={
         'console_scripts': [
+            'path_publisher = ros2_mpc.scripts.path_publisher:main',
         ],
     },
 )

@@ -84,7 +84,7 @@ def main():
     cmd_vel_publisher = CmdVelPublisher()
     planner = GlobalPlanner()
     mpc = Mpc(dt, N)
-    goal_xy = np.array([7.0, 0.0])
+    goal_xy = np.array([4.0, -0.5])
     COMPUTE_PATH = True
     planning_rate = 1
     timer_period = 1.0 / planning_rate
@@ -121,10 +121,10 @@ def main():
             # Get the reference trajectory
             pxf, puf = get_reference_trajectory(x0, goal_xy, path_xy, path_heading, path_velocity, path_omega, mpc)
 
-        tic = time.time()
+        tictic = time.time()
         # noinspection PyUnboundLocalVariable
         x, u = mpc.perform_mpc(u0, x0, pxf, puf)
-        print(time.time() - tic)
+        print(time.time() - tictic)
         # Publish the control
         cmd_vel_publisher.publish_cmd(u[0], u[1])
         if np.linalg.norm(x0[0:2] - goal_xy) < 0.15:

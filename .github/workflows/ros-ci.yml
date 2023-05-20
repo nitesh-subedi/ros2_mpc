@@ -1,4 +1,4 @@
-name: humble-devel
+name: Build ros2_mpc
 
 # Controls when the action will run. Triggers the workflow on push or pull request
 on:
@@ -53,5 +53,6 @@ jobs:
         uses: ros-tooling/action-ros-ci@v0.3
         with:
           package-name: ros2_mpc
+          import-token: ${{ secrets.TOKEN_GITHUB }}
           target-ros2-distro: ${{ matrix.ros_distribution }}
   

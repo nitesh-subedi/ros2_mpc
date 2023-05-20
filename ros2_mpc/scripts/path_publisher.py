@@ -65,7 +65,7 @@ def main():
         map_image, map_info = map_node.get_map()
         pos, ori, velocity = odom_node.get_states()
         # Dilate the map image
-        map_image = dilate_image(map_image, 10)
+        map_image = dilate_image(map_image, 5)
         # Get the current position of the robot
         robot_on_map = utils.world_to_map(pos[0], pos[1], map_image, map_info)
         start = (robot_on_map[1], robot_on_map[0])

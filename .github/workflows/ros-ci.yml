@@ -49,11 +49,13 @@ jobs:
         uses: ros-tooling/setup-ros@v0.6
         with:
           required-ros-distributions: ${{ matrix.ros_distribution }}
+      - name: Install dependencies
+        run: |
+          cd ros_ws/src/ros2_mpc && pip3 install -r requirements.txt
+
       - name: Build and Test
         uses: ros-tooling/action-ros-ci@v0.3
         with:
           package-name: ros2_mpc
           import-token: ${{ secrets.TOKEN_GITHUB }}
           target-ros2-distro: ${{ matrix.ros_distribution }}
-          requirements-txt: ros_ws/src/ros2_mpc/requirements.txt
-  

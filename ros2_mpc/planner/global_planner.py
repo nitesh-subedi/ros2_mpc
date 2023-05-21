@@ -24,6 +24,9 @@ class GlobalPlanner:
 
     def get_path(self, start, goal, map_image):
         """Returns the path from start to goal in the grid"""
-        path = astar.find_path(start, goal, neighbors_fnct=lambda n: self.neighbours(n, map_image), reversePath=False,
-                               heuristic_cost_estimate_fnct=self.heuristic)
+        try:
+            path = astar.find_path(start, goal, neighbors_fnct=lambda n: self.neighbours(n, map_image), reversePath=False,
+                                   heuristic_cost_estimate_fnct=self.heuristic)
+        except IndexError:
+            path = []
         return list(path)

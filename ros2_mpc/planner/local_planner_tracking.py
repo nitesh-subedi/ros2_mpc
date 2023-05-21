@@ -1,5 +1,8 @@
 import casadi
 import numpy as np
+from ament_index_python.packages import get_package_share_directory
+import os
+import yaml
 
 
 # import matplotlib.pyplot as plt
@@ -19,10 +22,10 @@ class Mpc:
         self.X, self.U, self.P_X, self.P_U = self.get_decision_variables()
 
         # Perform integration using RK4
-        self.rk4()
+        # self.rk4()
 
         # Perform integration using Euler
-        # self.euler_integration()
+        self.euler_integration()
 
         # obstacles_cost = self.define_obstacles_cost_function()
         # Define cost function
@@ -34,8 +37,11 @@ class Mpc:
         # # Define obstacle avoidance constraints
         # self.obstacle_avoidance_constraints()
 
+        # Define opts for solver
+        opts = {"ipopt.print_level": 0, "print_time": 0}
+
         # Define solver
-        self.opti.solver('ipopt')
+        self.opti.solver('ipopt', opts)
 
     # def define_obstacles_cost_function(self, cost_factor):
     #     obj = 0
@@ -74,14 +80,18 @@ class Mpc:
         self.opti.subject_to(self.opti.bounded(-0.1, self.U[1, :], 0.1))
 
     def define_cost_function(self):
+        project_path = get_package_share_directory('ros2_mpc')
+        with open(os.path.join(project_path, 'config/params.yaml'), 'r') as file:
+            params = yaml.safe_load(file)
         # Define cost function
         Q = np.eye(self.n_states, dtype=float)
-        Q[0, 0] = 0.5
-        Q[1, 1] = 0.5
-        Q[2, 2] = 0.0005
+        Q[0, 0] = params['Q'][0]
+        Q[1, 1] = params['Q'][1]
+        Q[2, 2] = params['Q'][2]
         obj = 0
         R = np.eye(self.n_controls, dtype=float)
-        R = R * 0.1
+        R[0, 0] = params['R'][0]
+        R[1, 1] = params['R'][1]
         for k in range(self.N):
             st = self.X[:, k]
             con = self.U[:, k]
@@ -96,8 +106,8 @@ class Mpc:
         self.X[:, 0] = self.P_X[0:self.n_states]
         for k in range(self.N):
             x_next = self.X[:, k] + self.dt * self.f(self.X[:, k], self.U[:, k])
-            self.X[:, k + 1] = x_next
-            # self.opti.subject_to(self.X[:, k + 1] == x_next)
+            # self.X[:, k + 1] = x_next
+            self.opti.subject_to(self.X[:, k + 1] == x_next)
 
     def rk4(self):
         self.X[:, 0] = self.P_X[0:self.n_states]  # Initial State

@@ -7,7 +7,11 @@ import numpy as np
 from ros2_mpc.ros_topics import OdomSubscriber, MapSubscriber
 from ros2_mpc import utils
 import cv2
-import time
+# import time
+# Import config parser to read the parameters from the yaml file
+import yaml
+from ament_index_python.packages import get_package_share_directory
+import os
 
 
 def get_headings(path_xy, dt):
@@ -44,7 +48,7 @@ class PathPublisher(Node):
             self.pose.pose.orientation.w = np.cos(heading_angles[i] / 2)
             self.msg.poses.append(self.pose)
         self.publisher.publish(self.msg)
-        self.get_logger().info("Path Published!")
+        # self.get_logger().info("Path Published!")
 
 
 def dilate_image(image, kernel_size):
@@ -59,8 +63,15 @@ def main():
     map_node = MapSubscriber()
     odom_node = OdomSubscriber()
     planner = GlobalPlanner()
-    goal_xy = np.array([5.0, -0.6])
+    project_path = get_package_share_directory('ros2_mpc')
+    # get the goal position from the yaml file
+    with open(os.path.join(project_path, 'config/params.yaml'), 'r') as file:
+        params = yaml.safe_load(file)
+    dt = float(params['dt'])
+    goal_xy = params['goal_pose']
+    # goal_xy = np.array([5.0, -0.6])
     map_node.get_logger().info('Waiting for map...')
+    path_last = None
     while True:
         map_image, map_info = map_node.get_map()
         pos, ori, velocity = odom_node.get_states()
@@ -73,15 +84,27 @@ def main():
         goal_on_map = utils.world_to_map(goal_xy[0], goal_xy[1], map_image, map_info)
         # Swap the x and y coordinates
         goal = (goal_on_map[1], goal_on_map[0])
-        path = planner.get_path(start, goal, map_image)
+        # Check if the path is empty
+        if len(planner.get_path(start, goal, map_image)) == 0:
+            path_publisher.get_logger().warning("Path empty. Using last path as reference!")
+            path = path_last
+        else:
+            path = planner.get_path(start, goal, map_image)
+            path_last = path
+        if path_last is None:
+            path_publisher.get_logger().error("Goal Unreachable!")
         # Convert the path to world coordinates
         path_xy = utils.map_to_world(path, map_image, map_info)
         # Compute the headings
-        dt = 0.2
-        path_heading, _, _ = get_headings(path_xy, dt)
-        print(len(path_xy), len(path_heading))
+        try:
+            path_heading, _, _ = get_headings(path_xy, dt)
+        except IndexError:
+            path_publisher.get_logger().info("Goal Reached!")
+            break
         path_publisher.publish_path(path_xy, path_heading)
-        time.sleep(0.1)
+        # time.sleep(0.1)
+    path_publisher.destroy_node()
+    rclpy.shutdown()
 
 
 if __name__ == '__main__':

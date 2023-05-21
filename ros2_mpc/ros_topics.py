@@ -32,7 +32,7 @@ class MapSubscriber(Node):
         self.map_image = self.map_image.astype(np.uint8) * 255
         # Flip the map image
         self.map_image = np.flipud(self.map_image)
-        self.get_logger().info("Map received!")
+        # self.get_logger().info("Map received!")
 
     def get_map(self):
         rclpy.spin_once(self)
@@ -49,7 +49,7 @@ class CmdVelPublisher(Node):
         self.pub.linear.x = v
         self.pub.angular.z = w
         self.cmd_publisher.publish(self.pub)
-        self.get_logger().info("cmd published!")
+        # self.get_logger().info("cmd published!")
 
 
 class OdomSubscriber(Node):
@@ -66,7 +66,7 @@ class OdomSubscriber(Node):
             msg.pose.pose.orientation.x, msg.pose.pose.orientation.y, msg.pose.pose.orientation.z,
             msg.pose.pose.orientation.w)).round(decimals=2)
         self.velocities = np.array([msg.twist.twist.linear.x, msg.twist.twist.angular.z]).round(decimals=2)
-        self.get_logger().info("Data received!")
+        # self.get_logger().info("Odom received!")
 
     def get_states(self):
         rclpy.spin_once(self)
@@ -84,7 +84,7 @@ class LaserSubscriber(Node):
     def laser_callback(self, msg):
         self.laser_data = np.array(msg.ranges)
         self.angles = np.array([msg.angle_min, msg.angle_max])
-        self.get_logger().info("Data received!")
+        # self.get_logger().info("Data received!")
 
     def get_scan(self):
         rclpy.spin_once(self)

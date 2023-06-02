@@ -9,7 +9,6 @@ def generate_launch_description():
     path_subscriber_local_planner_node = Node(
         package='ros2_mpc',
         executable='local_planner',
-        # name='mpc_planner',
         output='screen',
         remappings=[('/cmd_vel', '/cmd_vel'), ('/odom', '/odom'), ('/path', '/path')],
         arguments=['--ros-args', '--log-level', 'INFO']
@@ -17,7 +16,6 @@ def generate_launch_description():
     path_publisher_node = Node(
         package='ros2_mpc',
         executable='path_publisher',
-        # name='global_planner',
         output='screen',
         remappings=[('/path', '/path')],
         arguments=['--ros-args', '--log-level', 'INFO']

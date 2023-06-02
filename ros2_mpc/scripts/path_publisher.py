@@ -4,11 +4,10 @@ from geometry_msgs.msg import PoseStamped
 from nav_msgs.msg import Path
 from ros2_mpc.planner.global_planner import GlobalPlanner
 import numpy as np
-from ros2_mpc.ros_topics import OdomSubscriber, MapSubscriber
+from ros2_mpc.ros_topics import OdomSubscriber, MapSubscriber, GoalSubscriber
 from ros2_mpc import utils
 import cv2
-# import time
-# Import config parser to read the parameters from the yaml file
+import time
 import yaml
 from ament_index_python.packages import get_package_share_directory
 import os
@@ -63,16 +62,22 @@ def main():
     map_node = MapSubscriber()
     odom_node = OdomSubscriber()
     planner = GlobalPlanner()
+    goal_listener = GoalSubscriber()
     project_path = get_package_share_directory('ros2_mpc')
     # get the goal position from the yaml file
     with open(os.path.join(project_path, 'config/params.yaml'), 'r') as file:
         params = yaml.safe_load(file)
     dt = float(params['dt'])
-    goal_xy = params['goal_pose']
     # goal_xy = np.array([5.0, -0.6])
     map_node.get_logger().info('Waiting for map...')
+    goal_listener.get_logger().info("Waiting for goal!")
+    # goal_xy = goal_listener.get_goal()[:2]
     path_last = None
     while True:
+        try:
+            goal_xy = goal_listener.get_goal()[:2]
+        except TypeError:
+            continue
         map_image, map_info = map_node.get_map()
         pos, ori, velocity = odom_node.get_states()
         # Dilate the map image
@@ -98,13 +103,12 @@ def main():
         # Compute the headings
         try:
             path_heading, _, _ = get_headings(path_xy, dt)
+            path_publisher.publish_path(path_xy, path_heading)
         except IndexError:
             path_publisher.get_logger().info("Goal Reached!")
-            break
-        path_publisher.publish_path(path_xy, path_heading)
-        # time.sleep(0.1)
-    path_publisher.destroy_node()
-    rclpy.shutdown()
+        time.sleep(0.1)
+    # path_publisher.destroy_node()
+    # rclpy.shutdown()
 
 
 if __name__ == '__main__':

@@ -3,7 +3,7 @@ from rclpy.node import Node
 from nav_msgs.msg import Path
 import numpy as np
 from ros2_mpc.planner.local_planner_tracking import Mpc
-from ros2_mpc.ros_topics import OdomSubscriber, CmdVelPublisher
+from ros2_mpc.ros_topics import OdomSubscriber, CmdVelPublisher, GoalSubscriber
 from ros2_mpc import utils
 import time
 import yaml
@@ -23,13 +23,13 @@ def get_headings(path_xy, dt):
     return path_heading, path_velocity, path_omega
 
 
-def get_reference_trajectory(x0, goal_xy, path_xy, path_heading, path_velocity, path_omega, mpc, robot_controller):
+def get_reference_trajectory(x0, goal, path_xy, path_heading, path_velocity, path_omega, mpc, robot_controller):
     # Get the nearest point on the path to the robot
     nearest_point = np.argmin(np.linalg.norm(x0[0:2] - path_xy, axis=1))
     if np.linalg.norm(x0[0:2] - path_xy[-1, :]) < 0.5:
         # Put all points of path to be the goal
-        goal_new = np.append(np.array(goal_xy), 0)
-        pxf = np.tile(goal_new, mpc.N).reshape(-1, 1)
+        # goal_new = goal
+        pxf = np.tile(goal, mpc.N).reshape(-1, 1)
         robot_controller.info("Inside Circle!")
     else:
         # Get the reference trajectory
@@ -102,13 +102,14 @@ def main():
     robot_controller = RobotController()
     odom_node = OdomSubscriber()
     cmd_vel_publisher = CmdVelPublisher()
+    goal_listener = GoalSubscriber()
     project_path = get_package_share_directory('ros2_mpc')
     # get the goal position from the yaml file
     with open(os.path.join(project_path, 'config/params.yaml'), 'r') as file:
         params = yaml.safe_load(file)
     dt = params['dt']
     N = params['N']
-    goal_xy = np.array(params['goal_pose'])
+    # goal_xy = np.array(params['goal_pose'])
     mpc = Mpc(dt, N)
     robot_controller.get_logger().info("Waiting for path!")
     odom_node.get_logger().info("Waiting for odom!")
@@ -116,8 +117,12 @@ def main():
     path_xy, path_heading = robot_controller.get_path()
     robot_controller.get_logger().info("Time taken to get path: {}".format(time.time() - tic))
     REFRESH_TIME = 2.0
-    tic = time.time()
+    goal_listener.get_logger().info("Waiting for goal!")
     while True:
+        try:
+            goal = goal_listener.get_goal()
+        except TypeError:
+            continue
         pos, ori, velocity = odom_node.get_states()
         if time.time() - tic > REFRESH_TIME:
             tic = time.time()
@@ -129,20 +134,25 @@ def main():
         # Define initial control
         u0 = np.zeros((mpc.n_controls, mpc.N))
         # Get the reference trajectory
-        pxf, puf = get_reference_trajectory(x0, goal_xy, path_xy, path_heading, path_velocity, path_omega, mpc,
+        pxf, puf = get_reference_trajectory(x0, goal, path_xy, path_heading, path_velocity, path_omega, mpc,
                                             robot_controller.get_logger())
         # noinspection PyUnboundLocalVariable
-        x, u = mpc.perform_mpc(u0, x0, pxf, puf)
-        # Publish the control
-        cmd_vel_publisher.publish_cmd(u[0], u[1])
-        robot_controller.get_logger().info("Passing new path to the controller!")
-        if np.linalg.norm(x0[0:2] - goal_xy) < 0.15:
-            break
-    cmd_vel_publisher.publish_cmd(0.0, 0.0)
-    odom_node.destroy_node()
-    robot_controller.destroy_node()
-    cmd_vel_publisher.destroy_node()
-    rclpy.shutdown()
+        try:
+            x, u = mpc.perform_mpc(u0, x0, pxf, puf)
+            # Publish the control
+            cmd_vel_publisher.publish_cmd(u[0], u[1])
+            robot_controller.get_logger().info("Passing new path to the controller!")
+            if np.linalg.norm(x0[0:2] - goal[0:2]) < 0.15:
+                cmd_vel_publisher.publish_cmd(0.0, 0.0)
+                robot_controller.get_logger().info("Goal reached!")
+        except RuntimeError:
+            cmd_vel_publisher.publish_cmd(0.0, 0.0)
+            time.sleep(0.1)
+    # cmd_vel_publisher.publish_cmd(0.0, 0.0)
+    # odom_node.destroy_node()
+    # robot_controller.destroy_node()
+    # cmd_vel_publisher.destroy_node()
+    # rclpy.shutdown()
 
 
 if __name__ == '__main__':

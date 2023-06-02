@@ -1,7 +1,7 @@
 import rclpy
 from rclpy.node import Node
 from nav_msgs.msg import OccupancyGrid
-from geometry_msgs.msg import Twist
+from geometry_msgs.msg import Twist, PoseStamped
 from sensor_msgs.msg import LaserScan
 from nav_msgs.msg import Odometry
 import numpy as np
@@ -90,3 +90,22 @@ class LaserSubscriber(Node):
         rclpy.spin_once(self)
         time.sleep(0.1)
         return self.laser_data, self.angles
+
+
+class GoalSubscriber(Node):
+    def __init__(self):
+        super().__init__('goal_subscriber')
+        self.goal = None
+        self.goal_subscriber = self.create_subscription(PoseStamped, '/goal_pose', self.goal_callback, 10)
+
+    def goal_callback(self, msg):
+        goal_xy = np.array([msg.pose.position.x, msg.pose.position.y]).round(decimals=2)
+        goal_theta = np.array(utils.euler_from_quaternion(
+            msg.pose.orientation.x, msg.pose.orientation.y, msg.pose.orientation.z,
+            msg.pose.orientation.w)).round(decimals=2)
+        self.goal = np.concatenate((goal_xy, goal_theta))
+        # self.get_logger().info("Goal received!")
+
+    def get_goal(self):
+        rclpy.spin_once(self, timeout_sec=0.05)
+        return self.goal

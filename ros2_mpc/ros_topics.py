@@ -109,3 +109,7 @@ class GoalSubscriber(Node):
     def get_goal(self):
         rclpy.spin_once(self, timeout_sec=0.05)
         return self.goal
+
+    def get_new_goal(self):
+        rclpy.spin_once(self)
+        return self.goal

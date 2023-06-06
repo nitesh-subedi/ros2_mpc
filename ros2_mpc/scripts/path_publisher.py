@@ -104,8 +104,14 @@ def main():
         try:
             path_heading, _, _ = get_headings(path_xy, dt)
             path_publisher.publish_path(path_xy, path_heading)
+            if len(path_xy) <= 5:
+                path_publisher.get_logger().info("Goal Reached!")
+                goal_listener.get_logger().info("Waiting for goal!")
+                rclpy.spin_once(goal_listener)
         except IndexError:
             path_publisher.get_logger().info("Goal Reached!")
+            goal_listener.get_logger().info("Waiting for goal!")
+            rclpy.spin_once(goal_listener)
         time.sleep(0.1)
     # path_publisher.destroy_node()
     # rclpy.shutdown()

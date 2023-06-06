@@ -30,7 +30,7 @@ def get_reference_trajectory(x0, goal, path_xy, path_heading, path_velocity, pat
         # Put all points of path to be the goal
         # goal_new = goal
         pxf = np.tile(goal, mpc.N).reshape(-1, 1)
-        robot_controller.info("Inside Circle!")
+        # robot_controller.info("Inside Circle!")
     else:
         # Get the reference trajectory
         pxf = path_xy[nearest_point:nearest_point + mpc.N, :]
@@ -127,7 +127,7 @@ def main():
         if time.time() - tic > REFRESH_TIME:
             tic = time.time()
             path_xy, path_heading = robot_controller.get_path()
-            robot_controller.get_logger().info("Time taken to get path: {}".format(time.time() - tic))
+            # robot_controller.get_logger().info("Time taken to get path: {}".format(time.time() - tic))
         _, path_velocity, path_omega = get_headings(path_xy, dt)
         # Define initial state
         x0 = np.array([pos[0], pos[1], ori[2]])
@@ -137,17 +137,21 @@ def main():
         pxf, puf = get_reference_trajectory(x0, goal, path_xy, path_heading, path_velocity, path_omega, mpc,
                                             robot_controller.get_logger())
         # noinspection PyUnboundLocalVariable
-        try:
-            x, u = mpc.perform_mpc(u0, x0, pxf, puf)
-            # Publish the control
-            cmd_vel_publisher.publish_cmd(u[0], u[1])
-            robot_controller.get_logger().info("Passing new path to the controller!")
+        # try:
+        x, u = mpc.perform_mpc(u0, x0, pxf, puf)
+        # Publish the control
+        cmd_vel_publisher.publish_cmd(u[0], u[1])
+        robot_controller.get_logger().info("Passing new path to the controller!")
+        if x0 is not None and goal is not None:
+            # robot_controller.get_logger().info("Current position: {}".format(x0))
+            # robot_controller.get_logger().info("Goal position: {}".format(goal))
+            robot_controller.get_logger().info("Distance: {}".format(np.linalg.norm(x0[0:2] - goal[0:2])))
             if np.linalg.norm(x0[0:2] - goal[0:2]) < 0.15:
                 cmd_vel_publisher.publish_cmd(0.0, 0.0)
                 robot_controller.get_logger().info("Goal reached!")
-        except RuntimeError:
-            cmd_vel_publisher.publish_cmd(0.0, 0.0)
-            time.sleep(0.1)
+        # except RuntimeError:
+        #     cmd_vel_publisher.publish_cmd(0.0, 0.0)
+        #     time.sleep(0.1)
     # cmd_vel_publisher.publish_cmd(0.0, 0.0)
     # odom_node.destroy_node()
     # robot_controller.destroy_node()

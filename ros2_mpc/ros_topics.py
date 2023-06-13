@@ -6,7 +6,7 @@ from sensor_msgs.msg import LaserScan
 from nav_msgs.msg import Odometry
 import numpy as np
 from ros2_mpc import utils
-import time
+# import time
 
 
 class MapSubscriber(Node):
@@ -70,7 +70,7 @@ class OdomSubscriber(Node):
 
     def get_states(self):
         rclpy.spin_once(self)
-        time.sleep(0.1)
+        # time.sleep(0.1)
         return self.position, self.orientation, self.velocities
 
 
@@ -88,7 +88,7 @@ class LaserSubscriber(Node):
 
     def get_scan(self):
         rclpy.spin_once(self)
-        time.sleep(0.1)
+        # time.sleep(0.1)
         return self.laser_data, self.angles
 
 

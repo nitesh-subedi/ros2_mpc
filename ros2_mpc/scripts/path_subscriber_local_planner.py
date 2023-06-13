@@ -3,7 +3,7 @@ from rclpy.node import Node
 from nav_msgs.msg import Path
 import numpy as np
 from ros2_mpc.planner.local_planner_tracking import Mpc
-from ros2_mpc.ros_topics import OdomSubscriber, CmdVelPublisher, GoalSubscriber
+from ros2_mpc.ros_topics import OdomSubscriber, CmdVelPublisher, GoalSubscriber, LaserSubscriber
 from ros2_mpc import utils
 import time
 import yaml
@@ -95,20 +95,55 @@ class RobotController(Node):
         return self.path_xy, self.path_heading
 
 
+def get_obstacles(scan_data, angles, size, resolution, pos, ori, obstacles_x, obstacles_y):
+    occ_grid = 1 - utils.convert_laser_scan_to_occupancy_grid(scan_data, angles, resolution, size * 2)
+    occ_grid = np.rot90(occ_grid, k=2)
+    x, y = utils.convert_to_map_coordinates(occ_grid=occ_grid, map_resolution=resolution)
+    obstacles_indices = np.where(occ_grid == 0)
+    obs_x, obs_y = x[obstacles_indices], y[obstacles_indices]
+    obstacle_array = np.array([obs_x, obs_y])
+    rotated_obstacle = utils.rotate_coordinates(obstacle_array, ori[2])
+    rotated_obstacle[0, :] += pos[0]
+    rotated_obstacle[1, :] += pos[1]
+
+    y_obs = rotated_obstacle[1, :]
+    x_obs = rotated_obstacle[0, :]
+    try:
+        x_obs_array = obstacles_x * x_obs[0]
+        # x_obs_array = x_obs_array.ravel()
+        x_obs_array[:len(x_obs)] = x_obs
+        # x_obs_array = np.reshape(x_obs_array, obstacles_x.shape)
+        y_obs_array = obstacles_y * y_obs[0]
+        # y_obs_array = y_obs_array.ravel()
+        y_obs_array[:len(y_obs)] = y_obs
+        y_obs_array = np.reshape(y_obs_array, obstacles_y.shape)
+        # print(x_obs_array, y_obs_array)
+
+    except IndexError as e:
+        print(e, "No obstacles")
+        x_obs_array = obstacles_x * 100
+        y_obs_array = obstacles_y * 100
+
+    return x_obs_array, y_obs_array
+
+
 def main():
     rclpy.init()
     robot_controller = RobotController()
     odom_node = OdomSubscriber()
     cmd_vel_publisher = CmdVelPublisher()
     goal_listener = GoalSubscriber()
+    laser_node = LaserSubscriber()
     project_path = get_package_share_directory('ros2_mpc')
     # get the goal position from the yaml file
     with open(os.path.join(project_path, 'config/params.yaml'), 'r') as file:
         params = yaml.safe_load(file)
     dt = params['dt']
-    N = params['N']
-    # goal_xy = np.array(params['goal_pose'])
-    mpc = Mpc(dt, N)
+    size = params['costmap_size']
+    resolution = params['resolution']
+    obstacles_y = np.ones(int((size * 2) / resolution) * 2)
+    obstacles_x = np.ones(int((size * 2) / resolution) * 2)
+    mpc = Mpc()
     robot_controller.get_logger().info("Waiting for path!")
     odom_node.get_logger().info("Waiting for odom!")
     tic = time.time()
@@ -122,7 +157,10 @@ def main():
             goal = goal_listener.get_goal()
         except TypeError:
             continue
+        scan_data, angles = laser_node.get_scan()
         pos, ori, velocity = odom_node.get_states()
+        x_obs_array, y_obs_array = get_obstacles(scan_data, angles, size, resolution, pos, ori, obstacles_x,
+                                                 obstacles_y)
         if time.time() - tic > REFRESH_TIME:
             tic = time.time()
             path_xy, path_heading = robot_controller.get_path()
@@ -134,7 +172,7 @@ def main():
         u0 = np.zeros((mpc.n_controls, mpc.N))
         # Get the reference trajectory
         pxf, puf = get_reference_trajectory(x0, goal, path_xy, path_heading, path_velocity, path_omega, mpc)
-        x, u = mpc.perform_mpc(u0, x0, pxf, puf)
+        x, u = mpc.perform_mpc(u0, x0, pxf, puf, obstacles_x=x_obs_array, obstacles_y=y_obs_array)
         # Publish the control
         cmd_vel_publisher.publish_cmd(u[0], u[1])
         if x0 is not None and goal is not None:

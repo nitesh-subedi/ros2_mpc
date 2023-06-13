@@ -152,7 +152,7 @@ def main(args=None):
     laser_node = LaserSubscriber()
     odom_node = OdomSubscriber()
     scale = 5
-    resolution = 0.1
+    resolution = 0.05
     size = 2.5
     while rclpy.ok():
         scan_data, angles = laser_node.get_scan()

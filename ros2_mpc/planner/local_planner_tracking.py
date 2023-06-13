@@ -9,10 +9,14 @@ import yaml
 
 
 class Mpc:
-    def __init__(self, dt, N):
-        self.dt = dt
-        self.N = N
-        # self.inflation_radius = inflation_radius
+    def __init__(self):
+        project_path = get_package_share_directory('ros2_mpc')
+        # get the goal position from the yaml file
+        with open(os.path.join(project_path, 'config/params.yaml'), 'r') as file:
+            params = yaml.safe_load(file)
+        self.dt = params['dt']
+        self.N = params['N']
+        # params['inflation_radius = inflation_radius
         self.opti = casadi.Opti()
 
         # Get system function 'f'
@@ -27,9 +31,12 @@ class Mpc:
         # Perform integration using Euler
         self.euler_integration()
 
-        # obstacles_cost = self.define_obstacles_cost_function()
+        self.obstacles_x = self.opti.parameter(int((params['costmap_size'] * 2) / params['resolution']) * 2)
+        self.obstacles_y = self.opti.parameter(int((params['costmap_size'] * 2) / params['resolution']) * 2)
+
+        obstacles_cost = self.define_obstacles_cost_function(params)
         # Define cost function
-        self.define_cost_function()
+        self.define_cost_function(params, obstacles_cost=0)
 
         # Define constraints
         self.constraints()
@@ -43,20 +50,23 @@ class Mpc:
         # Define solver
         self.opti.solver('ipopt', opts)
 
-    # def define_obstacles_cost_function(self, cost_factor):
-    #     obj = 0
-    #     for k in range(self.N + 1):
-    #         for i in range(self.obstacles_x.shape[0]):
-    #             hxy = casadi.log(((self.X[0, k] - self.obstacles_x[i]) / self.inflation_radius) ** 2 + (
-    #                     (self.X[1, k] - self.obstacles_y[i]) / self.inflation_radius) ** 2)
-    #             obj = obj + casadi.exp(cost_factor * casadi.exp(-hxy))
-    #     return obj
+    def define_obstacles_cost_function(self, params):
+        obj = 0
+        for k in range(self.N + 1):
+            for i in range(self.obstacles_x.shape[0]):
+                hxy = casadi.log(((self.X[0, k] - self.obstacles_x[i]) / params['inflation_radius']) ** 2 + (
+                        (self.X[1, k] - self.obstacles_y[i]) / params['inflation_radius']) ** 2)
+                obj = obj + casadi.exp(params['cost_factor'] * casadi.exp(-hxy))
+        return obj
 
-    def perform_mpc(self, u0, x0, pf, puf):
+    def perform_mpc(self, u0, x0, pf, puf, obstacles_x=None, obstacles_y=None):
         # Set initial state and parameter value
         self.opti.set_initial(self.U, u0)
         self.opti.set_value(self.P_X, casadi.vertcat(x0, pf))
         self.opti.set_value(self.P_U, puf)
+        if obstacles_x is not None and obstacles_y is not None:
+            self.opti.set_value(self.obstacles_x, obstacles_x)
+            self.opti.set_value(self.obstacles_y, obstacles_y)
         # Solve the optimization problem
         sol = self.opti.solve()
         # Extract optimal control
@@ -79,10 +89,10 @@ class Mpc:
         self.opti.subject_to(self.opti.bounded(-0.1, self.U[0, :], 0.1))
         self.opti.subject_to(self.opti.bounded(-0.1, self.U[1, :], 0.1))
 
-    def define_cost_function(self):
-        project_path = get_package_share_directory('ros2_mpc')
-        with open(os.path.join(project_path, 'config/params.yaml'), 'r') as file:
-            params = yaml.safe_load(file)
+    def define_cost_function(self, params, obstacles_cost):
+        # project_path = get_package_share_directory('ros2_mpc')
+        # with open(os.path.join(project_path, 'config/params.yaml'), 'r') as file:
+        #     params = yaml.safe_load(file)
         # Define cost function
         Q = np.eye(self.n_states, dtype=float)
         Q[0, 0] = params['Q'][0]
@@ -100,6 +110,7 @@ class Mpc:
                 (st - self.P_X[self.n_states * (k + 1):self.n_states * (k + 1) + self.n_states])) + casadi.mtimes(
                 casadi.mtimes((con - self.P_U[self.n_controls * k:self.n_controls * k + self.n_controls]).T, R),
                 (con - self.P_U[self.n_controls * k:self.n_controls * k + self.n_controls]))
+        obj = obj + obstacles_cost
         self.opti.minimize(obj)
 
     def euler_integration(self):

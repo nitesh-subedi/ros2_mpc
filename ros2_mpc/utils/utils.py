@@ -81,7 +81,10 @@ def world_to_map(world_x, world_y, map_image, map_info):
 
 def map_to_world(path, map_image, map_info):
     path = np.array(path)
-    path = np.column_stack((path[:, 1], map_image.shape[0] - path[:, 0]))
+    try:
+        path = np.column_stack((path[:, 1], map_image.shape[0] - path[:, 0]))
+    except IndexError:
+        return None
     # Convert back to world coordinates
     path_xy = path * map_info['resolution'] + map_info['origin']
     return path_xy

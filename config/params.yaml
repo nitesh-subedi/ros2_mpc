@@ -1,8 +1,8 @@
 dt: 0.2
 N: 10
-Q: [0.5, 0.5, 0.00005]
+Q: [0.5, 0.5, 0.05]
 R: [0.1, 0.1]
-resolution: 0.05
-cost_factor: 0.5
+resolution: 0.5
+cost_factor: 0.05
 costmap_size: 2.0
-inflation_radius: 0.2
+inflation_radius: 0.5

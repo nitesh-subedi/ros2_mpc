@@ -79,11 +79,19 @@ def main():
         except TypeError:
             continue
         map_image, map_info = map_node.get_map()
-        pos, ori, velocity = odom_node.get_states()
+        pos, ori = odom_node.get_states()
+        if pos is None:
+            continue
         # Dilate the map image
         map_image = dilate_image(map_image, 5)
         # Get the current position of the robot
         robot_on_map = utils.world_to_map(pos[0], pos[1], map_image, map_info)
+        # # Log the current position of the robot
+        # path_publisher.get_logger().info("Robot Position: {}".format(robot_on_map))
+        # # Log map info
+        # path_publisher.get_logger().info("Map Info: {}".format(map_info))
+        # # Log robot position
+        path_publisher.get_logger().info("Robot xy Position: {}".format(pos))
         start = (robot_on_map[1], robot_on_map[0])
         # Get the goal position of the robot
         goal_on_map = utils.world_to_map(goal_xy[0], goal_xy[1], map_image, map_info)
@@ -98,8 +106,12 @@ def main():
             path_last = path
         if path_last is None:
             path_publisher.get_logger().error("Goal Unreachable!")
+            continue
         # Convert the path to world coordinates
         path_xy = utils.map_to_world(path, map_image, map_info)
+        # if path_xy is None:
+        #     path_publisher.get_logger().error("Goal Unreachable!")
+        #     continue
         # Compute the headings
         try:
             path_heading, _, _ = get_headings(path_xy, dt)

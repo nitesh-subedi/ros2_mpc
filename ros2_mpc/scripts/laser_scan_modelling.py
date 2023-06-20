@@ -62,7 +62,7 @@ class OdomSubscriber(Node):
         super().__init__('odom_subscriber')
         self.orientation = None
         self.position = None
-        self.odom_subscriber = self.create_subscription(Odometry, '/odom', self.odom_callback, 10)
+        self.odom_subscriber = self.create_subscription(Odometry, '/robot_position', self.odom_callback, 10)
 
     def odom_callback(self, msg):
         self.position = np.array([msg.pose.pose.position.x + 3.0, msg.pose.pose.position.y - 1.0])
@@ -167,8 +167,8 @@ def main(args=None):
         obs_x, obs_y = x[obstacles_indices], y[obstacles_indices]
         obstacle_array = np.array([obs_x, obs_y])
         rotated_obstacle = rotate_coordinates(obstacle_array, ori[2])
-        rotated_obstacle[0, :] += pos[0]
-        rotated_obstacle[1, :] += pos[1]
+        # rotated_obstacle[0, :] += pos[0]
+        # rotated_obstacle[1, :] += pos[1]
         plt.scatter(rotated_obstacle[0], rotated_obstacle[1])
         # plt.scatter(obs_x, obs_y)
         plt.show()

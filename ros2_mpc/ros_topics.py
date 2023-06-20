@@ -58,10 +58,10 @@ class OdomSubscriber(Node):
         self.velocities = None
         self.orientation = None
         self.position = None
-        self.odom_subscriber = self.create_subscription(Odometry, '/odom', self.odom_callback, 10)
+        self.odom_subscriber = self.create_subscription(Odometry, '/robot_position', self.odom_callback, 10)
 
     def odom_callback(self, msg):
-        self.position = np.array([msg.pose.pose.position.x + 3.0, msg.pose.pose.position.y - 1.0]).round(decimals=2)
+        self.position = np.array([msg.pose.pose.position.x, msg.pose.pose.position.y]).round(decimals=2)
         self.orientation = np.array(utils.euler_from_quaternion(
             msg.pose.pose.orientation.x, msg.pose.pose.orientation.y, msg.pose.pose.orientation.z,
             msg.pose.pose.orientation.w)).round(decimals=2)
@@ -71,7 +71,7 @@ class OdomSubscriber(Node):
     def get_states(self):
         rclpy.spin_once(self)
         # time.sleep(0.1)
-        return self.position, self.orientation, self.velocities
+        return self.position, self.orientation
 
 
 class LaserSubscriber(Node):

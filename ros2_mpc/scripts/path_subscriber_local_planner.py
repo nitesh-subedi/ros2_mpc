@@ -1,3 +1,4 @@
+import matplotlib.pyplot as plt
 import rclpy
 from rclpy.node import Node
 from nav_msgs.msg import Path
@@ -25,7 +26,7 @@ def get_headings(path_xy, dt):
 
 def get_reference_trajectory(x0, goal, path_xy, path_heading, path_velocity, path_omega, mpc):
     # Get the nearest point on the path to the robot
-    nearest_point = np.argmin(np.linalg.norm(x0[0:2] - path_xy, axis=1))
+    nearest_point = 0  # np.argmin(np.linalg.norm(x0[0:2] - path_xy, axis=1))
     if np.linalg.norm(x0[0:2] - path_xy[-1, :]) < 0.5:
         pxf = np.tile(goal[:3], mpc.N).reshape(-1, 1)
     else:
@@ -66,7 +67,7 @@ def get_reference_trajectory(x0, goal, path_xy, path_heading, path_velocity, pat
         puf = np.column_stack((path_velocity[nearest_point:nearest_point + mpc.N],
                                path_omega[nearest_point:nearest_point + mpc.N]))
 
-    puf = puf.flatten().reshape(-1, 1)
+    puf = puf.flatten().reshape(-1, 1) * 0.0 + 0.05
     return pxf, puf
 
 
@@ -95,30 +96,22 @@ class RobotController(Node):
         return self.path_xy, self.path_heading
 
 
-def get_obstacles(scan_data, angles, size, resolution, pos, ori, obstacles_x, obstacles_y, robot_controller):
+def get_obstacles(scan_data, angles, size, resolution, pos, ori, obstacles_x, obstacles_y):
     occ_grid = 1 - utils.convert_laser_scan_to_occupancy_grid(scan_data, angles, resolution, size * 2)
     occ_grid = np.rot90(occ_grid, k=2)
-    robot_controller.info('Occupancy grid shape: {}'.format(occ_grid.shape))
     x, y = utils.convert_to_map_coordinates(occ_grid=occ_grid, map_resolution=resolution)
-    robot_controller.info('X shape: {}'.format(x.shape))
-    robot_controller.info('Y shape: {}'.format(y.shape))
+    # print(time.time() - tic)
     obstacles_indices = np.where(occ_grid == 0)
     obs_x, obs_y = x[obstacles_indices], y[obstacles_indices]
     obstacle_array = np.array([obs_x, obs_y])
-    robot_controller.info('Obstacle array shape: {}'.format(obstacle_array.shape))
     rotated_obstacle = utils.rotate_coordinates(obstacle_array, ori[2])
-    robot_controller.info('Rotated obstacle shape: {}'.format(rotated_obstacle.shape))
     rotated_obstacle[0, :] += pos[0]
     rotated_obstacle[1, :] += pos[1]
-    robot_controller.info('Rotated obstacle shape: {}'.format(rotated_obstacle.shape))
 
     y_obs = rotated_obstacle[1, :]
     x_obs = rotated_obstacle[0, :]
     try:
         x_obs_array = obstacles_x * x_obs[0]
-        robot_controller.info('x_obs_array shape: {}'.format(x_obs_array.shape))
-        robot_controller.info('x_obs: {}'.format(x_obs.shape))
-
         # x_obs_array = x_obs_array.ravel()
         x_obs_array[:len(x_obs)] = x_obs
         # x_obs_array = np.reshape(x_obs_array, obstacles_x.shape)
@@ -174,10 +167,10 @@ def main():
         if pos is None:
             continue
         x_obs_array, y_obs_array = get_obstacles(scan_data, angles, size, resolution, pos, ori, obstacles_x,
-                                                 obstacles_y, robot_controller.get_logger())
-        x_obs_array = x_obs_array * -1
-        y_obs_array = y_obs_array * -1
-        robot_controller.get_logger().info("Obstacles_x: {}".format(x_obs_array))
+                                                 obstacles_y)
+        # x_obs_array = x_obs_array * -1
+        # y_obs_array = y_obs_array * -1
+        # robot_controller.get_logger().info("Obstacles_x: {}".format(x_obs_array))
         if time.time() - tic > REFRESH_TIME:
             tic = time.time()
             path_xy, path_heading = robot_controller.get_path()
@@ -189,13 +182,15 @@ def main():
         u0 = np.zeros((mpc.n_controls, mpc.N))
         # Get the reference trajectory
         pxf, puf = get_reference_trajectory(x0, goal, path_xy, path_heading, path_velocity, path_omega, mpc)
-        x, u, obstacle_cost, position_cost = mpc.perform_mpc(u0, x0, pxf, puf, obstacles_x=x_obs_array,
-                                                             obstacles_y=y_obs_array)
-        robot_controller.get_logger().info("Obstacle cost: {}".format(obstacle_cost))
-        robot_controller.get_logger().info("Position cost: {}".format(position_cost))
+        x, u = mpc.perform_mpc(u0, x0, pxf, puf, obstacles_x=x_obs_array,
+                               obstacles_y=y_obs_array)
+        # robot_controller.get_logger().info("Obstacle cost: {}".format(obstacle_cost))
+        # robot_controller.get_logger().info("Position cost: {}".format(position_cost))
         # Publish the control
-        # cmd_vel_publisher.publish_cmd(u[0], u[1])
-        cmd_vel_publisher.publish_cmd(0.0, 0.0)
+        cmd_vel_publisher.publish_cmd(u[0], u[1])
+        if GOAL_FLAG:
+            cmd_vel_publisher.publish_cmd(0.0, 0.0)
+        # cmd_vel_publisher.publish_cmd(0.0, 0.0)
         if x0 is not None and goal is not None:
             if np.linalg.norm(x0[0:2] - goal[0:2]) > 0.15:
                 if GOAL_FLAG:
@@ -206,6 +201,7 @@ def main():
                 if not GOAL_FLAG:
                     cmd_vel_publisher.publish_cmd(0.0, 0.0)
                     robot_controller.get_logger().info("Goal reached!")
+                    cmd_vel_publisher.publish_cmd(0.0, 0.0)
                     GOAL_FLAG = True
 
 

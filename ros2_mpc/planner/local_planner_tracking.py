@@ -59,7 +59,7 @@ class Mpc:
                 self.hxy = casadi.log(((self.X[0, k] - self.obstacles_x[i]) / params['inflation_radius']) ** 2 + (
                         (self.X[1, k] - self.obstacles_y[i]) / params['inflation_radius']) ** 2)
                 obj = obj + casadi.exp(casadi.exp(-self.hxy) * 3.0) * params['cost_factor']
-        self.hxy = obj
+        # self.hxy = obj
         return obj
 
     def perform_mpc(self, u0, x0, pf, puf, obstacles_x=None, obstacles_y=None):
@@ -75,9 +75,9 @@ class Mpc:
         # Extract optimal control
         u_opt = sol.value(self.U)
         x_opt = sol.value(self.X)
-        obstacle_cost = sol.value(self.hxy)
-        position_cost = sol.value(self.position_cost)
-        return x_opt, u_opt[:, 0], obstacle_cost, position_cost
+        # obstacle_cost = sol.value(self.hxy)
+        # position_cost = sol.value(self.position_cost)
+        return x_opt, u_opt[:, 0]  # , obstacle_cost, position_cost
 
     # def obstacle_avoidance_constraints(self):
     #     # Define obstacle at (x,y) = (5,3)
@@ -91,13 +91,10 @@ class Mpc:
 
     def constraints(self):
         # Define constraints
-        self.opti.subject_to(self.opti.bounded(-0.1, self.U[0, :], 0.1))
+        self.opti.subject_to(self.opti.bounded(-0.05, self.U[0, :], 0.05))
         self.opti.subject_to(self.opti.bounded(-0.1, self.U[1, :], 0.1))
 
     def define_cost_function(self, params, obstacles_cost):
-        # project_path = get_package_share_directory('ros2_mpc')
-        # with open(os.path.join(project_path, 'config/params.yaml'), 'r') as file:
-        #     params = yaml.safe_load(file)
         # Define cost function
         Q = np.eye(self.n_states, dtype=float)
         Q[0, 0] = params['Q'][0]
@@ -115,8 +112,8 @@ class Mpc:
                 (st - self.P_X[self.n_states * (k + 1):self.n_states * (k + 1) + self.n_states])) + casadi.mtimes(
                 casadi.mtimes((con - self.P_U[self.n_controls * k:self.n_controls * k + self.n_controls]).T, R),
                 (con - self.P_U[self.n_controls * k:self.n_controls * k + self.n_controls]))
-        self.position_cost = obj
-        obj = obj + obstacles_cost * 0
+        # self.position_cost = obj
+        obj = obj + obstacles_cost
         self.opti.minimize(obj)
 
     def euler_integration(self):

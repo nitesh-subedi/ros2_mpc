@@ -8,6 +8,42 @@ import cv2
 from numba import njit
 import math
 from matplotlib import pyplot as plt
+from ros2_mpc import utils
+import os
+import yaml
+
+
+def get_obstacles(scan_data, angles, size, resolution, pos, ori, obstacles_x, obstacles_y):
+    occ_grid = 1 - convert_laser_scan_to_occupancy_grid(scan_data, angles, resolution, size * 2)
+    occ_grid = np.rot90(occ_grid, k=2)
+    x, y = convert_to_map_coordinates(occ_grid=occ_grid, map_resolution=resolution)
+    # print(time.time() - tic)
+    obstacles_indices = np.where(occ_grid == 0)
+    obs_x, obs_y = x[obstacles_indices], y[obstacles_indices]
+    obstacle_array = np.array([obs_x, obs_y])
+    rotated_obstacle = rotate_coordinates(obstacle_array, ori[2])
+    rotated_obstacle[0, :] += pos[0]
+    rotated_obstacle[1, :] += pos[1]
+
+    y_obs = rotated_obstacle[1, :]
+    x_obs = rotated_obstacle[0, :]
+    try:
+        x_obs_array = obstacles_x * x_obs[0]
+        # x_obs_array = x_obs_array.ravel()
+        x_obs_array[:len(x_obs)] = x_obs
+        # x_obs_array = np.reshape(x_obs_array, obstacles_x.shape)
+        y_obs_array = obstacles_y * y_obs[0]
+        # y_obs_array = y_obs_array.ravel()
+        y_obs_array[:len(y_obs)] = y_obs
+        y_obs_array = np.reshape(y_obs_array, obstacles_y.shape)
+        # print(x_obs_array, y_obs_array)
+
+    except IndexError as e:
+        print(e, "No obstacles")
+        x_obs_array = obstacles_x * 100
+        y_obs_array = obstacles_y * 100
+
+    return x_obs_array, y_obs_array
 
 
 def convert_laser_scan_to_occupancy_grid(laser_scan_data, angles, map_resolution, map_size):
@@ -65,7 +101,7 @@ class OdomSubscriber(Node):
         self.odom_subscriber = self.create_subscription(Odometry, '/robot_position', self.odom_callback, 10)
 
     def odom_callback(self, msg):
-        self.position = np.array([msg.pose.pose.position.x + 3.0, msg.pose.pose.position.y - 1.0])
+        self.position = np.array([msg.pose.pose.position.x, msg.pose.pose.position.y])
         self.orientation = np.array(euler_from_quaternion(
             msg.pose.pose.orientation.x, msg.pose.pose.orientation.y, msg.pose.pose.orientation.z,
             msg.pose.pose.orientation.w))
@@ -151,27 +187,39 @@ def main(args=None):
     rclpy.init(args=args)
     laser_node = LaserSubscriber()
     odom_node = OdomSubscriber()
-    scale = 5
-    resolution = 0.05
-    size = 2.5
+    project_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
+    with open(os.path.join(project_path, 'config/params.yaml'), 'r') as file:
+        params = yaml.safe_load(file)
+    dt = params['dt']
+    size = params['costmap_size']
+    resolution = params['resolution']
+    obstacles_y = np.ones(int((size * 2) / resolution) * 2)
+    obstacles_x = np.ones(int((size * 2) / resolution) * 2)
     while rclpy.ok():
         scan_data, angles = laser_node.get_scan()
         pos, ori = odom_node.get_states()
+        odom_node.get_logger().info("Robot Pose: " + str(pos) + " " + str(ori))
         if scan_data is None:
             continue
-        occ_grid = 1 - convert_laser_scan_to_occupancy_grid(scan_data, angles, resolution, size * 2)
-        occ_grid = np.rot90(occ_grid, k=2)
-        x, y = convert_to_map_coordinates(occ_grid=occ_grid, map_resolution=resolution)
-        # print(time.time() - tic)
-        obstacles_indices = np.where(occ_grid == 0)
-        obs_x, obs_y = x[obstacles_indices], y[obstacles_indices]
-        obstacle_array = np.array([obs_x, obs_y])
-        rotated_obstacle = rotate_coordinates(obstacle_array, ori[2])
+        rotated_obstaclex, rotated_obstacley = get_obstacles(scan_data, angles, size, resolution, pos, ori, obstacles_x,
+                                                             obstacles_y)
+        # occ_grid = 1 - convert_laser_scan_to_occupancy_grid(scan_data, angles, resolution, size * 2)
+        # occ_grid = np.rot90(occ_grid, k=2)
+        # x, y = convert_to_map_coordinates(occ_grid=occ_grid, map_resolution=resolution)
+        # # print(time.time() - tic)
+        # obstacles_indices = np.where(occ_grid == 0)
+        # obs_x, obs_y = x[obstacles_indices], y[obstacles_indices]
+        # obstacle_array = np.array([obs_x, obs_y])
+        # rotated_obstacle = rotate_coordinates(obstacle_array, ori[2])
         # rotated_obstacle[0, :] += pos[0]
         # rotated_obstacle[1, :] += pos[1]
-        plt.scatter(rotated_obstacle[0], rotated_obstacle[1])
+        print(rotated_obstaclex.shape, rotated_obstacley.shape)
+        print(obstacles_x.shape, obstacles_y.shape)
+        plt.scatter(rotated_obstaclex, rotated_obstacley)
         # plt.scatter(obs_x, obs_y)
         plt.show()
+        # plt.scatter(x_obs_array[0], x_obs_array[1])
+        # plt.show()
         pass
 
         # print(x, y)

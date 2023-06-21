@@ -91,8 +91,8 @@ class Mpc:
 
     def constraints(self):
         # Define constraints
-        self.opti.subject_to(self.opti.bounded(-0.05, self.U[0, :], 0.05))
-        self.opti.subject_to(self.opti.bounded(-0.1, self.U[1, :], 0.1))
+        self.opti.subject_to(self.opti.bounded(-0.1, self.U[0, :], 0.2))
+        self.opti.subject_to(self.opti.bounded(-0.2, self.U[1, :], 0.2))
 
     def define_cost_function(self, params, obstacles_cost):
         # Define cost function
@@ -112,8 +112,9 @@ class Mpc:
                 (st - self.P_X[self.n_states * (k + 1):self.n_states * (k + 1) + self.n_states])) + casadi.mtimes(
                 casadi.mtimes((con - self.P_U[self.n_controls * k:self.n_controls * k + self.n_controls]).T, R),
                 (con - self.P_U[self.n_controls * k:self.n_controls * k + self.n_controls]))
+            obj = obj + (1 / casadi.exp(con[0])) ** params['reverse_factor']
         # self.position_cost = obj
-        obj = obj + obstacles_cost
+        # obj = obj + obstacles_cost
         self.opti.minimize(obj)
 
     def euler_integration(self):

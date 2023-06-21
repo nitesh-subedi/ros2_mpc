@@ -26,7 +26,7 @@ def get_headings(path_xy, dt):
 
 def get_reference_trajectory(x0, goal, path_xy, path_heading, path_velocity, path_omega, mpc):
     # Get the nearest point on the path to the robot
-    nearest_point = 0  # np.argmin(np.linalg.norm(x0[0:2] - path_xy, axis=1))
+    nearest_point = np.argmin(np.linalg.norm(x0[0:2] - path_xy, axis=1))
     if np.linalg.norm(x0[0:2] - path_xy[-1, :]) < 0.5:
         pxf = np.tile(goal[:3], mpc.N).reshape(-1, 1)
     else:
@@ -76,7 +76,7 @@ class RobotController(Node):
         super().__init__('robot_controller')
         self.path_xy = None
         self.path_heading = None
-        self.create_subscription(Path, 'my_path', self.path_callback, 10)
+        self.create_subscription(Path, '/received_global_plan', self.path_callback, 10)
 
     def path_callback(self, msg):
         path = np.zeros((len(msg.poses), 2))
@@ -201,6 +201,7 @@ def main():
                 if not GOAL_FLAG:
                     cmd_vel_publisher.publish_cmd(0.0, 0.0)
                     robot_controller.get_logger().info("Goal reached!")
+                    robot_controller.get_logger().info("Waiting for goal!")
                     cmd_vel_publisher.publish_cmd(0.0, 0.0)
                     GOAL_FLAG = True
 

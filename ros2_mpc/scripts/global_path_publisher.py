@@ -91,7 +91,7 @@ def main():
         # # Log map info
         # path_publisher.get_logger().info("Map Info: {}".format(map_info))
         # # Log robot position
-        path_publisher.get_logger().info("Robot xy Position: {}".format(pos))
+        # path_publisher.get_logger().info("Robot xy Position: {}".format(pos))
         start = (robot_on_map[1], robot_on_map[0])
         # Get the goal position of the robot
         goal_on_map = utils.world_to_map(goal_xy[0], goal_xy[1], map_image, map_info)
@@ -107,6 +107,12 @@ def main():
         if path_last is None:
             path_publisher.get_logger().error("Goal Unreachable!")
             continue
+        plt.imshow(map_image)
+        plt.plot(start[0], start[1], 'ro')
+        plt.plot(goal[0], goal[1], 'go')
+        plt.plot(path[:, 1], path[:, 0], 'r')
+        plt.show()
+        break
         # Convert the path to world coordinates
         path_xy = utils.map_to_world(path, map_image, map_info)
         # if path_xy is None:

@@ -1,4 +1,3 @@
-import matplotlib.pyplot as plt
 import rclpy
 from rclpy.node import Node
 from nav_msgs.msg import Path
@@ -76,7 +75,7 @@ class RobotController(Node):
         super().__init__('robot_controller')
         self.path_xy = None
         self.path_heading = None
-        self.create_subscription(Path, '/received_global_plan', self.path_callback, 10)
+        self.create_subscription(Path, '/my_path', self.path_callback, 10)
 
     def path_callback(self, msg):
         path = np.zeros((len(msg.poses), 2))
@@ -202,7 +201,6 @@ def main():
                     cmd_vel_publisher.publish_cmd(0.0, 0.0)
                     robot_controller.get_logger().info("Goal reached!")
                     robot_controller.get_logger().info("Waiting for goal!")
-                    cmd_vel_publisher.publish_cmd(0.0, 0.0)
                     GOAL_FLAG = True
 
 

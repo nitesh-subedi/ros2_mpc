@@ -107,17 +107,11 @@ def main():
         if path_last is None:
             path_publisher.get_logger().error("Goal Unreachable!")
             continue
-        plt.imshow(map_image)
-        plt.plot(start[0], start[1], 'ro')
-        plt.plot(goal[0], goal[1], 'go')
-        plt.plot(path[:, 1], path[:, 0], 'r')
-        plt.show()
-        break
         # Convert the path to world coordinates
         path_xy = utils.map_to_world(path, map_image, map_info)
-        # if path_xy is None:
-        #     path_publisher.get_logger().error("Goal Unreachable!")
-        #     continue
+        if path_xy is None:
+            path_publisher.get_logger().error("Goal Unreachable!")
+            continue
         # Compute the headings
         try:
             path_heading, _, _ = get_headings(path_xy, dt)

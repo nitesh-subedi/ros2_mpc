@@ -75,7 +75,7 @@ class RobotController(Node):
         super().__init__('robot_controller')
         self.path_xy = None
         self.path_heading = None
-        self.create_subscription(Path, '/my_path', self.path_callback, 10)
+        self.create_subscription(Path, '/received_global_plan', self.path_callback, 10)
 
     def path_callback(self, msg):
         path = np.zeros((len(msg.poses), 2))
@@ -91,7 +91,7 @@ class RobotController(Node):
         self.path_heading = headings
 
     def get_path(self):
-        rclpy.spin_once(self)
+        rclpy.spin_once(self, timeout_sec=0.1)
         return self.path_xy, self.path_heading
 
 
@@ -151,7 +151,7 @@ def main():
     tic = time.time()
     path_xy, path_heading = robot_controller.get_path()
     robot_controller.get_logger().info("Time taken to get path: {}".format(time.time() - tic))
-    REFRESH_TIME = 2.0
+    REFRESH_TIME = 3.0
     goal_listener.get_logger().info("Waiting for goal!")
     GOAL_FLAG = False
     while True:
@@ -167,13 +167,13 @@ def main():
             continue
         x_obs_array, y_obs_array = get_obstacles(scan_data, angles, size, resolution, pos, ori, obstacles_x,
                                                  obstacles_y)
-        # x_obs_array = x_obs_array * -1
-        # y_obs_array = y_obs_array * -1
-        # robot_controller.get_logger().info("Obstacles_x: {}".format(x_obs_array))
         if time.time() - tic > REFRESH_TIME:
             tic = time.time()
             path_xy, path_heading = robot_controller.get_path()
             # robot_controller.get_logger().info("Time taken to get path: {}".format(time.time() - tic))
+        if path_xy is None:
+            time.sleep(0.1)
+            continue
         _, path_velocity, path_omega = get_headings(path_xy, dt)
         # Define initial state
         x0 = np.array([pos[0], pos[1], ori[2]])
@@ -183,8 +183,6 @@ def main():
         pxf, puf = get_reference_trajectory(x0, goal, path_xy, path_heading, path_velocity, path_omega, mpc)
         x, u = mpc.perform_mpc(u0, x0, pxf, puf, obstacles_x=x_obs_array,
                                obstacles_y=y_obs_array)
-        # robot_controller.get_logger().info("Obstacle cost: {}".format(obstacle_cost))
-        # robot_controller.get_logger().info("Position cost: {}".format(position_cost))
         # Publish the control
         cmd_vel_publisher.publish_cmd(u[0], u[1])
         if GOAL_FLAG:

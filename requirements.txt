@@ -5,3 +5,5 @@ numba==0.57.0
 opencv-python~=4.7.0.72
 matplotlib==3.7.1
 astar~=0.98
+rrtplanner~=0.1.2
+setuptools~=58.2.0

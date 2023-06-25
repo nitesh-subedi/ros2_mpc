@@ -2,7 +2,7 @@ import rclpy
 from ros2_mpc.ros_topics import OdomSubscriber, CmdVelPublisher, MapSubscriber
 import numpy as np
 from ros2_mpc.planner.local_planner_tracking import Mpc
-from ros2_mpc.planner.global_planner import GlobalPlanner
+from ros2_mpc.planner.global_planner import AstarGlobalPlanner
 import cv2
 from ros2_mpc import utils
 import time
@@ -82,7 +82,7 @@ def main():
     map_node = MapSubscriber()
     odom_node = OdomSubscriber()
     cmd_vel_publisher = CmdVelPublisher()
-    planner = GlobalPlanner()
+    planner = AstarGlobalPlanner()
     mpc = Mpc(dt, N)
     goal_xy = np.array([4.0, -0.5])
     COMPUTE_PATH = True

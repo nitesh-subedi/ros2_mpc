@@ -2,7 +2,7 @@ import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import PoseStamped
 from nav_msgs.msg import Path
-from ros2_mpc.planner.global_planner import GlobalPlanner
+from ros2_mpc.planner.global_planner import AstarGlobalPlanner, RRTGlobalPlanner
 import numpy as np
 from ros2_mpc.ros_topics import OdomSubscriber, MapSubscriber, GoalSubscriber
 from ros2_mpc import utils
@@ -52,7 +52,7 @@ class PathPublisher(Node):
 
 def dilate_image(image, kernel_size):
     kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (kernel_size, kernel_size))
-    image = cv2.dilate(image, kernel, iterations=1)
+    image = cv2.erode(image, kernel, iterations=2)
     return image.astype(np.uint8)
 
 
@@ -61,7 +61,7 @@ def main():
     path_publisher = PathPublisher()
     map_node = MapSubscriber()
     odom_node = OdomSubscriber()
-    planner = GlobalPlanner()
+    planner = AstarGlobalPlanner()
     goal_listener = GoalSubscriber()
     project_path = get_package_share_directory('ros2_mpc')
     # get the goal position from the yaml file
@@ -79,6 +79,7 @@ def main():
         except TypeError:
             continue
         map_image, map_info = map_node.get_map()
+        # planner = RRTGlobalPlanner(map_image)
         pos, ori = odom_node.get_states()
         if pos is None:
             continue
@@ -98,11 +99,12 @@ def main():
         # Swap the x and y coordinates
         goal = (goal_on_map[1], goal_on_map[0])
         # Check if the path is empty
-        if len(planner.get_path(start, goal, map_image)) == 0:
+        path = planner.get_path(start, goal, map_image)
+        if len(path) == 0:
             path_publisher.get_logger().warning("Path empty. Using last path as reference!")
             path = path_last
         else:
-            path = planner.get_path(start, goal, map_image)
+            # path = planner.get_path(np.array(start), np.array(goal))
             path_last = path
         if path_last is None:
             path_publisher.get_logger().error("Goal Unreachable!")

@@ -2,7 +2,7 @@ import rclpy
 from ros2_mpc.ros_topics import OdomSubscriber, CmdVelPublisher
 import numpy as np
 from ros2_mpc.planner.local_planner_tracking import Mpc
-from ros2_mpc.planner.global_planner import GlobalPlanner
+from ros2_mpc.planner.global_planner import AstarGlobalPlanner
 import cv2
 
 
@@ -34,7 +34,7 @@ def main():
     goal[1] = map_image.shape[0] - goal[1]
     # Swap the x and y coordinates
     goal = (goal[1], goal[0])
-    planner = GlobalPlanner(map_image)
+    planner = AstarGlobalPlanner(map_image)
     path = planner.get_path(start, goal)
     # Convert back to bottom left origin
     path = np.array(path)

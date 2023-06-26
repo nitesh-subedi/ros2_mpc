@@ -1,86 +1,79 @@
-import numpy as np
-from rrtplanner import perlin_occupancygrid
-from rrtplanner import RRTStar, random_point_og
-import yaml
-import cv2
-from rrtplanner import plot_rrt_lines, plot_path, plot_og, plot_start_goal
 import matplotlib.pyplot as plt
+import numpy as np
+import heapq
+
+# Define the map size and resolution
+MAP_WIDTH = 10
+MAP_HEIGHT = 10
+MAP_RESOLUTION = 1.0
+
+# Define the start and goal positions (grid coordinates)
+start = (0, 0)
+goal = (9, 9)
+
+# Define the grid map with obstacle information
+obstacle_map = np.zeros((MAP_HEIGHT, MAP_WIDTH))
+obstacle_map[3:7, 4] = 1
+obstacle_map[4, 1:9] = 1
+
+# Define the costmap based on the obstacle information
+costmap = np.where(obstacle_map == 1, np.inf, 1)
 
 
-def get_points_on_lines(line_segments):
-    points = []
-
-    for segment in line_segments:
-        x1, y1 = segment[0]
-        x2, y2 = segment[1]
-        dx = abs(x2 - x1)
-        dy = abs(y2 - y1)
-        sx = -1 if x1 > x2 else 1
-        sy = -1 if y1 > y2 else 1
-        err = dx - dy
-
-        while x1 != x2 or y1 != y2:
-            points.append((x1, y1))
-            e2 = 2 * err
-            if e2 > -dy:
-                err -= dy
-                x1 += sx
-            if e2 < dx:
-                err += dx
-                y1 += sy
-
-        points.append((x2, y2))
-
-    return np.array(points)
+# Define the heuristic function (Euclidean distance)
+def heuristic(node):
+    dx = node[0] - goal[0]
+    dy = node[1] - goal[1]
+    return np.sqrt(dx ** 2 + dy ** 2)
 
 
-def erode_image(image, kernel_size):
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (kernel_size, kernel_size))
-    image = cv2.erode(image, kernel, iterations=1)
-    return image.astype(np.uint8)
+# Perform the A* search
+open_list = []
+heapq.heappush(open_list, (0, start))
+parent = {start: None}
+cost_so_far = {start: 0}
 
+while open_list:
+    current_cost, current_node = heapq.heappop(open_list)
 
-with open('/home/nitesh/projects/ros2_ws/src/ros2_mpc/maps/map_carto.yaml', 'r') as file:
-    params = yaml.safe_load(file)
-map_image = cv2.imread('/home/nitesh/projects/ros2_ws/src/ros2_mpc/maps/map_carto.pgm')
-# Change image to binary
-ret, map_image = cv2.threshold(map_image, params['occupied_thresh'], 255, cv2.THRESH_BINARY)
-# Convert it to grayscale
-map_image = erode_image(map_image, 5)
-map_image = cv2.cvtColor(map_image, cv2.COLOR_BGR2GRAY)
-map_image[map_image == 0] = 1
-map_image[map_image == 255] = 0
-og = map_image
-# og = perlin_occupancygrid(240, 240, 0.33)
-# print(map_image)
-n = 800
-r_rewire = 100
-rrts = RRTStar(og, n, r_rewire)
-xstart = np.array([100, 100])
-print(xstart)
-xgoal = np.array([50, 175])
-print(xgoal)
-T, gv = rrts.plan(xstart, xgoal)
-path = rrts.route2gv(T, gv)
-path_pts = rrts.vertices_as_ndarray(T, path)
-print(path_pts)
-line_points = get_points_on_lines(path_pts)
-print(line_points)
-# The path is in points connecting straight lines. We need to convert it to a list of points.
-# print(path_pts.shape)
-# print(type(path_pts))
-# print(path_pts)
-# plt.imshow(og, cmap='gray')
-# plt.show()
-# create figure and ax.
-fig = plt.figure()
-ax = fig.add_subplot()
+    if current_node == goal:
+        break
 
-# these functions alter ax in-place.
-plot_og(ax, og)
-plot_start_goal(ax, xstart, xgoal)
-# plot_rrt_lines(ax, T)
-plot_path(ax, path_pts)
-# plot_path(ax, np.array(line_points))
-plt.scatter(line_points[:, 0], line_points[:, 1])
+    neighbors = [
+        (current_node[0] - 1, current_node[1]),  # left
+        (current_node[0] + 1, current_node[1]),  # right
+        (current_node[0], current_node[1] - 1),  # down
+        (current_node[0], current_node[1] + 1)  # up
+    ]
+
+    for neighbor in neighbors:
+        if neighbor[0] < 0 or neighbor[0] >= MAP_WIDTH or \
+                neighbor[1] < 0 or neighbor[1] >= MAP_HEIGHT:
+            continue
+
+        new_cost = cost_so_far[current_node] + costmap[neighbor[1], neighbor[0]]
+        if neighbor not in cost_so_far or new_cost < cost_so_far[neighbor]:
+            cost_so_far[neighbor] = new_cost
+            priority = new_cost + heuristic(neighbor)
+            heapq.heappush(open_list, (priority, neighbor))
+            parent[neighbor] = current_node
+
+# Reconstruct the path
+path = []
+current_node = goal
+while current_node:
+    path.append(current_node)
+    current_node = parent[current_node]
+
+path.reverse()
+
+# Print the generated path
+print("Generated Path:")
+# for node in path:
+#     print(node)
+
+plt.plot([node[0] for node in path], [node[1] for node in path], 'b-')
+plt.plot(start[0], start[1], 'ro')
+plt.plot(goal[0], goal[1], 'ro')
+plt.plot(obstacle_map, 'k-')
 plt.show()

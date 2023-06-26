@@ -28,7 +28,7 @@ def get_headings(path_xy, dt):
 class PathPublisher(Node):
     def __init__(self):
         super().__init__("goal_publisher")
-        self.publisher = self.create_publisher(Path, 'my_path', 10)
+        self.publisher = self.create_publisher(Path, '/my_path', 10)
         self.pose = PoseStamped()
         self.msg = Path()
 

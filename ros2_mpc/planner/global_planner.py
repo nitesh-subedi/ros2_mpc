@@ -1,6 +1,7 @@
 import astar
 import numpy as np
 from rrtplanner import RRTStar
+import pyastar2d
 
 
 def get_points_on_lines(line_segments):
@@ -74,3 +75,20 @@ class RRTGlobalPlanner:
         path_pts = self.rrts.vertices_as_ndarray(T, path)
         line_points = get_points_on_lines(path_pts)
         return line_points
+
+
+class AStarPlanner2:
+    def __init__(self):
+        self.window_size = 10
+        pass
+
+    def get_path(self, start, goal, map_image):
+        map_image[map_image == 1] = 255
+        map_image[map_image == 0] = 1
+        map_image_astar = map_image.astype(np.float32)
+        path = pyastar2d.astar_path(map_image_astar, tuple(start), tuple(goal), allow_diagonal=False)
+        x = np.array(path[:, 1])
+        y = np.array(path[:, 0])
+        smooth_x = np.convolve(x, np.ones(self.window_size) / self.window_size, mode='valid').astype(np.int32)
+        smooth_y = np.convolve(y, np.ones(self.window_size) / self.window_size, mode='valid').astype(np.int32)
+        return list(zip(smooth_y, smooth_x))

@@ -17,7 +17,8 @@ def generate_launch_description():
         package='ros2_mpc',
         executable='path_publisher',
         output='screen',
-        arguments=['--ros-args', '--log-level', 'INFO']
+        arguments=['--ros-args', '--log-level', 'INFO'],
+        parameters=[{'use_sim_time': True}]
     )
 
     robot_state_publisher_node = Node(

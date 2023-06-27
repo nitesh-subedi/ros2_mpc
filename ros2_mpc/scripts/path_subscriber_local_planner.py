@@ -75,7 +75,7 @@ class RobotController(Node):
         super().__init__('robot_controller')
         self.path_xy = None
         self.path_heading = None
-        self.create_subscription(Path, '/received_global_plan', self.path_callback, 10)
+        self.create_subscription(Path, 'received_global_plan', self.path_callback, 10)
 
     def path_callback(self, msg):
         path = np.zeros((len(msg.poses), 2))

@@ -1,79 +1,57 @@
 import matplotlib.pyplot as plt
 import numpy as np
-import heapq
+import pyastar2d
+import cv2
+import yaml
+from ros2_mpc.planner.global_planner import AstarGlobalPlanner
 
-# Define the map size and resolution
-MAP_WIDTH = 10
-MAP_HEIGHT = 10
-MAP_RESOLUTION = 1.0
-
-# Define the start and goal positions (grid coordinates)
-start = (0, 0)
-goal = (9, 9)
-
-# Define the grid map with obstacle information
-obstacle_map = np.zeros((MAP_HEIGHT, MAP_WIDTH))
-obstacle_map[3:7, 4] = 1
-obstacle_map[4, 1:9] = 1
-
-# Define the costmap based on the obstacle information
-costmap = np.where(obstacle_map == 1, np.inf, 1)
+planner = AstarGlobalPlanner()
 
 
-# Define the heuristic function (Euclidean distance)
-def heuristic(node):
-    dx = node[0] - goal[0]
-    dy = node[1] - goal[1]
-    return np.sqrt(dx ** 2 + dy ** 2)
+def erode_image(image, kernel_size):
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (kernel_size, kernel_size))
+    image = cv2.erode(image, kernel, iterations=2)
+    return image.astype(np.uint8)
 
 
-# Perform the A* search
-open_list = []
-heapq.heappush(open_list, (0, start))
-parent = {start: None}
-cost_so_far = {start: 0}
+with open('/home/nitesh/projects/ros2_ws/src/ros2_mpc/maps/map_carto.yaml', 'r') as file:
+    params = yaml.safe_load(file)
+map_image = cv2.imread('/home/nitesh/projects/ros2_ws/src/ros2_mpc/maps/map_carto.pgm')
+# Change image to binary
+ret, map_image = cv2.threshold(map_image, params['occupied_thresh'], 255, cv2.THRESH_BINARY)
+# Convert it to grayscale
+map_image = cv2.cvtColor(map_image, cv2.COLOR_BGR2GRAY)
+map_image = erode_image(map_image, 5)
+map_image_ = map_image.copy()
+map_image_[map_image_ == 255] = 1
+map_image_ = 1 - map_image_
+map_image[map_image == 0] = 200
+map_image[map_image == 255] = 1
+map_image_astar = map_image.astype(np.float32)
 
-while open_list:
-    current_cost, current_node = heapq.heappop(open_list)
-
-    if current_node == goal:
-        break
-
-    neighbors = [
-        (current_node[0] - 1, current_node[1]),  # left
-        (current_node[0] + 1, current_node[1]),  # right
-        (current_node[0], current_node[1] - 1),  # down
-        (current_node[0], current_node[1] + 1)  # up
-    ]
-
-    for neighbor in neighbors:
-        if neighbor[0] < 0 or neighbor[0] >= MAP_WIDTH or \
-                neighbor[1] < 0 or neighbor[1] >= MAP_HEIGHT:
-            continue
-
-        new_cost = cost_so_far[current_node] + costmap[neighbor[1], neighbor[0]]
-        if neighbor not in cost_so_far or new_cost < cost_so_far[neighbor]:
-            cost_so_far[neighbor] = new_cost
-            priority = new_cost + heuristic(neighbor)
-            heapq.heappush(open_list, (priority, neighbor))
-            parent[neighbor] = current_node
-
-# Reconstruct the path
-path = []
-current_node = goal
-while current_node:
-    path.append(current_node)
-    current_node = parent[current_node]
-
-path.reverse()
-
-# Print the generated path
-print("Generated Path:")
-# for node in path:
-#     print(node)
-
-plt.plot([node[0] for node in path], [node[1] for node in path], 'b-')
-plt.plot(start[0], start[1], 'ro')
-plt.plot(goal[0], goal[1], 'ro')
-plt.plot(obstacle_map, 'k-')
+# The minimum cost must be 1 for the heuristic to be valid.
+# The weights array must have np.float32 dtype to be compatible with the C++ code.
+# weights = np.array([[1, 3, 3, 3, 3],
+#                     [2, 0, 3, 3, 3],
+#                     [2, 2, 0, 3, 3],
+#                     [2, 2, 2, 0, 3],
+#                     [2, 2, 2, 2, 1]], dtype=np.float32)
+# The start and goal coordinates are in matrix coordinates (i, j).
+start = (90, 90)
+goal = (50, 175)
+path = pyastar2d.astar_path(map_image_astar, start, goal, allow_diagonal=True)
+x = np.array(path[:, 1])
+y = np.array(path[:, 0])
+window_size = 10  # Adjust the window size as desired
+smooth_x = np.convolve(x, np.ones(window_size) / window_size, mode='valid').astype(np.int32)
+smooth_y = np.convolve(y, np.ones(window_size) / window_size, mode='valid').astype(np.int32)
+print(list(zip(smooth_x, smooth_y)))
+path_new = planner.get_path(start, goal, map_image_)
+print(path_new)
+plt.imshow(map_image, cmap='gray')
+plt.plot(x, y)
+plt.plot(smooth_x, smooth_y, label='Smoothed Path')
+plt.legend()
+plt.xlabel('X')
+plt.ylabel('Y')
 plt.show()

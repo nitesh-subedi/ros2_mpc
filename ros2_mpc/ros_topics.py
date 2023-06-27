@@ -6,6 +6,9 @@ from sensor_msgs.msg import LaserScan
 from nav_msgs.msg import Odometry
 import numpy as np
 from ros2_mpc import utils
+from rosgraph_msgs.msg import Clock
+
+
 # import time
 
 
@@ -113,3 +116,18 @@ class GoalSubscriber(Node):
     def get_new_goal(self):
         rclpy.spin_once(self)
         return self.goal
+
+
+class ClockSubscriber(Node):
+    def __init__(self):
+        super().__init__('clock_subscriber')
+        self.clock = None
+        self.create_subscription(Clock, '/clock', self.clock_callback, 50, qos_overriding_options=None)
+
+    def clock_callback(self, msg):
+        self.clock = msg.clock
+        self.get_logger().info("Clock received!")
+
+    def get_time(self):
+        rclpy.spin_once(self)
+        return self.clock

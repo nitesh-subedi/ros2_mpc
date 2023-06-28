@@ -26,6 +26,9 @@ def get_headings(path_xy, dt):
 def get_reference_trajectory(x0, goal, path_xy, path_heading, path_velocity, path_omega, mpc):
     # Get the nearest point on the path to the robot
     nearest_point = np.argmin(np.linalg.norm(x0[0:2] - path_xy, axis=1))
+    # First point is nearest point
+    # nearest_point = 20
+    
     if np.linalg.norm(x0[0:2] - path_xy[-1, :]) < 0.5:
         pxf = np.tile(goal[:3], mpc.N).reshape(-1, 1)
     else:
@@ -75,7 +78,7 @@ class RobotController(Node):
         super().__init__('robot_controller')
         self.path_xy = None
         self.path_heading = None
-        self.create_subscription(Path, 'received_global_plan', self.path_callback, 10)
+        self.create_subscription(Path, 'smoothed_plan', self.path_callback, 10)
 
     def path_callback(self, msg):
         path = np.zeros((len(msg.poses), 2))
@@ -151,7 +154,8 @@ def main():
     tic = time.time()
     path_xy, path_heading = robot_controller.get_path()
     robot_controller.get_logger().info("Time taken to get path: {}".format(time.time() - tic))
-    REFRESH_TIME = 3.0
+    REFRESH_TIME = 1.0
+    THINKING_FLAG = True
     goal_listener.get_logger().info("Waiting for goal!")
     GOAL_FLAG = False
     while True:
@@ -170,7 +174,7 @@ def main():
         if time.time() - tic > REFRESH_TIME:
             tic = time.time()
             path_xy, path_heading = robot_controller.get_path()
-            # robot_controller.get_logger().info("Time taken to get path: {}".format(time.time() - tic))
+            robot_controller.get_logger().info("Time taken to get path: {}".format(time.time() - tic))
         if path_xy is None:
             time.sleep(0.1)
             continue
@@ -192,6 +196,8 @@ def main():
             if np.linalg.norm(x0[0:2] - goal[0:2]) > 0.15:
                 if GOAL_FLAG:
                     robot_controller.get_logger().info("New goal received!" + str(goal))
+                    robot_controller.get_logger().info("Thinking!")
+                    time.sleep(2.0)
                 GOAL_FLAG = False
                 robot_controller.get_logger().info("Passing new path to the controller!")
             else:

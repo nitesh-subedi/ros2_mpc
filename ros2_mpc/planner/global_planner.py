@@ -2,6 +2,7 @@ import astar
 import numpy as np
 from rrtplanner import RRTStar
 import pyastar2d
+from scipy.signal import savgol_filter
 
 
 def get_points_on_lines(line_segments):
@@ -79,16 +80,25 @@ class RRTGlobalPlanner:
 
 class AStarPlanner2:
     def __init__(self):
-        self.window_size = 10
+        self.window_size = 11
+        self.poly_degree = 2
         pass
 
     def get_path(self, start, goal, map_image):
         map_image[map_image == 1] = 255
         map_image[map_image == 0] = 1
         map_image_astar = map_image.astype(np.float32)
-        path = pyastar2d.astar_path(map_image_astar, tuple(start), tuple(goal), allow_diagonal=False)
+        path = pyastar2d.astar_path(
+            map_image_astar, tuple(start), tuple(goal), allow_diagonal=False
+        )
         x = np.array(path[:, 1])
         y = np.array(path[:, 0])
-        smooth_x = np.convolve(x, np.ones(self.window_size) / self.window_size, mode='valid').astype(np.int32)
-        smooth_y = np.convolve(y, np.ones(self.window_size) / self.window_size, mode='valid').astype(np.int32)
-        return list(zip(smooth_y, smooth_x))
+        smoothed_y = savgol_filter(y, self.window_size, self.poly_degree, mode="nearest")
+        # smooth_x = np.convolve(
+        #     x, np.ones(self.window_size) / self.window_size, mode="valid"
+        # ).astype(np.int32)
+        # smooth_y = np.convolve(
+        #     y, np.ones(self.window_size) / self.window_size, mode="valid"
+        # ).astype(np.int32)
+        return list(zip(smoothed_y, x))
+

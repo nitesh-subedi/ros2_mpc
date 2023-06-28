@@ -13,6 +13,7 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
         ('share/' + package_name + '/config', ['config/params.yaml']),
+        ('share/' + package_name + '/config', ['config/rviz_config.rviz']),
         (os.path.join('share', package_name, 'launch'), glob(os.path.join('launch', '*launch.[pxy][yma]*')))
 
     ],

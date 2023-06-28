@@ -13,7 +13,7 @@ def convert_laser_scan_to_occupancy_grid(laser_scan_data, angles, map_resolution
     num_cells = int(map_size / cell_size)
 
     # Create an empty occupancy grid
-    occupancy_grid = np.zeros((num_cells, num_cells))
+    occupancy_grid = np.zeros((int(num_cells), int(num_cells)))
 
     # Convert laser scan data to Cartesian coordinates
     angles = np.arange(len(laser_scan_data)) * (angle_max - angle_min) / len(laser_scan_data) + angle_min

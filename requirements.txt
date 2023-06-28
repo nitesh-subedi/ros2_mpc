@@ -8,3 +8,4 @@ astar~=0.98
 rrtplanner~=0.1.2
 setuptools~=58.2.0
 pyastar2d
+scipy

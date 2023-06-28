@@ -1,9 +1,12 @@
 # Launch parameters for all nodes
 from launch import LaunchDescription
 from launch_ros.actions import Node
+from ament_index_python.packages import get_package_share_directory
+import os
 
 
 def generate_launch_description():
+    rviz_config_dir = os.path.join(get_package_share_directory('ros2_mpc'), 'config', 'rviz_config.rviz')
     # Get the launch directory
     # Specify the actions
     path_subscriber_local_planner_node = Node(
@@ -17,8 +20,8 @@ def generate_launch_description():
         package='ros2_mpc',
         executable='path_publisher',
         output='screen',
-        arguments=['--ros-args', '--log-level', 'INFO'],
-        parameters=[{'use_sim_time': True}]
+        arguments=['--ros-args', '--log-level', 'INFO']#,
+        # parameters=[{'use_sim_time': True}]
     )
 
     robot_state_publisher_node = Node(
@@ -28,10 +31,18 @@ def generate_launch_description():
         arguments=['--ros-args', '--log-level', 'INFO']
     )
 
+    rviz_node = Node(
+            package='rviz2',
+            executable='rviz2',
+            name='rviz2',
+            arguments=['-d', rviz_config_dir]
+    )
+
     # Create the launch description and populate
     ld = LaunchDescription()
     # Declare the launch options
     ld.add_action(path_subscriber_local_planner_node)
     ld.add_action(path_publisher_node)
     ld.add_action(robot_state_publisher_node)
+    ld.add_action(rviz_node)
     return ld

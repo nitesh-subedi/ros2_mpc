@@ -53,7 +53,7 @@ jobs:
         run: |
           pwd
           ls
-          # cd ros_ws/src/ros2_mpc && pip3 install -r requirements.txt
+          cd ros_ws/src/ros2_mpc && ls
 
       - name: Build and Test
         uses: ros-tooling/action-ros-ci@v0.3

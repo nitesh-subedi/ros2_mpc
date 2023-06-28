@@ -51,9 +51,7 @@ jobs:
           required-ros-distributions: ${{ matrix.ros_distribution }}
       - name: Install dependencies
         run: |
-          pwd
-          ls
-          cd ros_ws/src/ros2_mpc && ls
+          cd ros_ws/src/ros2_mpc && cd .. && ls && pip3 install -r requirements.txt
 
       - name: Build and Test
         uses: ros-tooling/action-ros-ci@v0.3

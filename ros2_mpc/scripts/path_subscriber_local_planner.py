@@ -69,7 +69,7 @@ def get_reference_trajectory(x0, goal, path_xy, path_heading, path_velocity, pat
         puf = np.column_stack((path_velocity[nearest_point:nearest_point + mpc.N],
                                path_omega[nearest_point:nearest_point + mpc.N]))
 
-    puf = puf.flatten().reshape(-1, 1) * 0.0 + 0.05
+    puf = puf.flatten().reshape(-1, 1)
     return pxf, puf
 
 
@@ -158,6 +158,7 @@ def main():
     THINKING_FLAG = True
     goal_listener.get_logger().info("Waiting for goal!")
     GOAL_FLAG = False
+    u_last = np.array([0, 0])
     while True:
         try:
             goal = goal_listener.get_goal()
@@ -188,16 +189,25 @@ def main():
         x, u = mpc.perform_mpc(u0, x0, pxf, puf, obstacles_x=x_obs_array,
                                obstacles_y=y_obs_array)
         # Publish the control
-        cmd_vel_publisher.publish_cmd(u[0], u[1])
+        # if np.linalg.norm(u - u_last) > 0.1:
+        # cmd_vel_publisher.publish_cmd(u[0], u[1])
         if GOAL_FLAG:
             cmd_vel_publisher.publish_cmd(0.0, 0.0)
+        else:
+            if np.linalg.norm(u - u_last) > 0.03:
+                robot_controller.get_logger().info("Controlling Acceleration!")
+                cmd_vel_publisher.publish_cmd(u_last[0] + 0.03, u_last[1] + 0.03)
+                u_last = u
+            else:
+                cmd_vel_publisher.publish_cmd(u[0], u[1])
+                u_last = u
         # cmd_vel_publisher.publish_cmd(0.0, 0.0)
         if x0 is not None and goal is not None:
             if np.linalg.norm(x0[0:2] - goal[0:2]) > 0.15:
                 if GOAL_FLAG:
                     robot_controller.get_logger().info("New goal received!" + str(goal))
-                    robot_controller.get_logger().info("Thinking!")
-                    time.sleep(2.0)
+                    # robot_controller.get_logger().info("Thinking!")
+                    # time.sleep(2.0)
                 GOAL_FLAG = False
                 robot_controller.get_logger().info("Passing new path to the controller!")
             else:
@@ -205,6 +215,7 @@ def main():
                     cmd_vel_publisher.publish_cmd(0.0, 0.0)
                     robot_controller.get_logger().info("Goal reached!")
                     robot_controller.get_logger().info("Waiting for goal!")
+                    cmd_vel_publisher.publish_cmd(0.0, 0.0)
                     GOAL_FLAG = True
 
 

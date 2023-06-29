@@ -1,13 +1,19 @@
 import casadi
 import numpy as np
+from ament_index_python.packages import get_package_share_directory
+import os
+import yaml
 # import matplotlib.pyplot as plt
 
 
 class Mpc:
-    def __init__(self, dt, N, cost_factor, costmap_size=2, resolution=0.05, inflation_radius=0.22):
-        self.dt = dt
-        self.N = N
-        self.inflation_radius = inflation_radius
+    def __init__(self):
+        project_path = get_package_share_directory('ros2_mpc')
+        with open(os.path.join(project_path, 'config/params.yaml'), 'r') as file:
+            params = yaml.safe_load(file)
+        self.dt = params['dt']
+        self.N = params['N']
+        self.inflation_radius = params['inflation_radius']
         self.opti = casadi.Opti()
 
         # Get system function 'f'
@@ -15,8 +21,8 @@ class Mpc:
 
         # Get decision variables
         self.X, self.U, self.P, self.obstacles_x, self.obstacles_y = self.get_decision_variables(
-            costmap_size=costmap_size,
-            resolution=resolution)
+            costmap_size=params['costmap_size'],
+            resolution=params['resolution'])
 
         # Perform integration using RK4
         self.rk4()
@@ -24,9 +30,9 @@ class Mpc:
         # Perform integration using Euler
         # self.euler_integration()
 
-        obstacles_cost = self.define_obstacles_cost_function(cost_factor=cost_factor)
+        obstacles_cost = self.define_obstacles_cost_function(cost_factor=params['reverse_factor'])
         # Define cost function
-        self.define_cost_function(obstacles_cost)
+        self.define_cost_function(obstacles_cost, params['cost_factor'])
 
         # Define constraints
         self.constraints()
@@ -76,7 +82,7 @@ class Mpc:
         self.opti.subject_to(self.opti.bounded(-0.2, self.U[0, :], 0.2))
         self.opti.subject_to(self.opti.bounded(-0.1, self.U[1, :], 0.1))
 
-    def define_cost_function(self, obstacles_cost):
+    def define_cost_function(self, obstacles_cost, reverse_factor):
         # Define cost function
         Q = np.eye(self.n_states, dtype=float)
         Q[0, 0] = 0.00005
@@ -90,7 +96,7 @@ class Mpc:
             con = self.U[:, k]
             obj = obj + casadi.mtimes(casadi.mtimes((st - self.P[self.n_states:2 * self.n_states]).T, Q),
                                       (st - self.P[self.n_states:2 * self.n_states])) + casadi.mtimes(
-                casadi.mtimes(con.T, R), con)
+                casadi.mtimes(con.T, R), con) + (1 / casadi.exp(con[0])) ** reverse_factor
         self.opti.minimize(obj + obstacles_cost)
 
     def euler_integration(self):

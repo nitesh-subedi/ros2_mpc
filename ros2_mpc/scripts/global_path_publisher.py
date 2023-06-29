@@ -94,7 +94,7 @@ def main(args=None):
         if pos is None:
             continue
         # Dilate the map image
-        map_image = erode_image(map_image, 5)
+        map_image = erode_image(map_image, 8)
         # cv2.imwrite('/home/nitesh/projects/ros2_ws/src/ros2_mpc/ros2_mpc/scripts/map.png', map_image)
         # Get the current position of the robot
         robot_on_map = utils.world_to_map(pos[0], pos[1], map_image, map_info)

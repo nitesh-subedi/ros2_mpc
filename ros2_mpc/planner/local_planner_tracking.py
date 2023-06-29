@@ -58,7 +58,7 @@ class Mpc:
             for i in range(self.obstacles_x.shape[0]):
                 self.hxy = casadi.log(((self.X[0, k] - self.obstacles_x[i]) / params['inflation_radius']) ** 2 + (
                         (self.X[1, k] - self.obstacles_y[i]) / params['inflation_radius']) ** 2)
-                obj = obj + casadi.exp(casadi.exp(-self.hxy) * 3.0) * params['cost_factor']
+                obj = obj + casadi.exp(casadi.exp(-self.hxy) * params['cost_factor'])
         # self.hxy = obj
         return obj
 
@@ -93,6 +93,15 @@ class Mpc:
         # Define constraints
         self.opti.subject_to(self.opti.bounded(-0.1, self.U[0, :], 0.2))
         self.opti.subject_to(self.opti.bounded(-0.2, self.U[1, :], 0.2))
+        # Compute acceleration from velocity
+        # for k in range(self.N-1):
+        #     linear_accel = self.U[0, k+1] - self.U[0, k]
+        #     # angular_accel = self.U[1, k+1] - self.U[1, k]
+        #     self.opti.subject_to(self.opti.bounded(-0.02, linear_accel, 0.02))
+            # self.opti.subject_to(self.opti.bounded(-0.02, angular_accel, 0.02))
+
+        
+        
 
     def define_cost_function(self, params, obstacles_cost):
         # Define cost function
@@ -112,7 +121,10 @@ class Mpc:
                 (st - self.P_X[self.n_states * (k + 1):self.n_states * (k + 1) + self.n_states])) + casadi.mtimes(
                 casadi.mtimes((con - self.P_U[self.n_controls * k:self.n_controls * k + self.n_controls]).T, R),
                 (con - self.P_U[self.n_controls * k:self.n_controls * k + self.n_controls]))
-            obj = obj + (1 / casadi.exp(con[0])) ** params['reverse_factor']
+            obj = obj + (1 / casadi.exp(con[0])) ** params['reverse_factor'] + obstacles_cost
+            # linear_acceleration = casadi.diff(con[0], self.dt)
+            # Decrease cost for rotation
+            # obj = obj + (1 / (con[1] ** 2)) * params['rotation_factor']
         # self.position_cost = obj
         # obj = obj + obstacles_cost
         self.opti.minimize(obj)

@@ -26,7 +26,8 @@ setup(
     entry_points={
         'console_scripts': [
             'path_publisher = ros2_mpc.scripts.global_path_publisher:main',
-            'local_planner = ros2_mpc.scripts.path_subscriber_local_planner:main',
+            'local_planner = ros2_mpc.scripts.path_follower_local_planner:main',
+            'local_point_follower = ros2_mpc.scripts.point_follower_local_planner:main',
             'robot_state_publisher = ros2_mpc.core.robot_state_publisher:main',
         ],
     },

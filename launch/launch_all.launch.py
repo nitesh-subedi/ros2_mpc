@@ -11,7 +11,7 @@ def generate_launch_description():
     # Specify the actions
     path_subscriber_local_planner_node = Node(
         package='ros2_mpc',
-        executable='local_planner',
+        executable='local_point_follower',
         output='screen',
         remappings=[('/cmd_vel', '/cmd_vel'), ('/odom', '/odom'), ('/path', '/path')],
         arguments=['--ros-args', '--log-level', 'INFO']

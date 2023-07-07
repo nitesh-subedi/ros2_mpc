@@ -12,9 +12,9 @@ import os
 
 
 def get_goal_for_mpc(path_xy, goal, pos):
-    lookahead_dist_ = 0.5
+    lookahead_dist_ = 0.2
     if np.linalg.norm(goal[:2] - pos[:2]) < lookahead_dist_:
-        goal_pose = goal
+        goal_pose = np.array([goal[0], goal[1],goal[4]])
     else:
         # Find the nearest point on the path that is greater than lookahead distance
         dist = np.linalg.norm(path_xy - pos[:2], axis=1)
@@ -129,12 +129,12 @@ def main():
             continue
         x_obs_array, y_obs_array = get_obstacles(scan_data, angles, size, resolution, pos, ori, obstacles_x,
                                                  obstacles_y)
-        if time.time() - tic > REFRESH_TIME:
-            tic = time.time()
-            path_xy = robot_controller.get_path()
-            robot_controller.get_logger().info("Time taken to get path: {}".format(time.time() - tic))
+        # if time.time() - tic > REFRESH_TIME:
+        #     tic = time.time()
+        path_xy = robot_controller.get_path()
+            # robot_controller.get_logger().info("Time taken to get path: {}".format(time.time() - tic))
         if path_xy is None:
-            time.sleep(0.1)
+            # time.sleep(0.1)
             continue
         # Define initial state
         x0 = np.array([pos[0], pos[1], ori[2]])
@@ -144,6 +144,8 @@ def main():
             continue
         # goal = get_goal_for_mpc(path_xy, goal, pos)
         robot_controller.get_logger().info("Goal: {}".format(goal))
+        # goal = np.array([goal[0], goal[1], goal[4]])
+        goal = get_goal_for_mpc(path_xy, goal, pos)
         # Get the reference trajectory
         u = mpc.perform_mpc(u0, initial_state=x0, final_state=goal, obstacles_x=x_obs_array,
                                obstacles_y=y_obs_array)

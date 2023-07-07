@@ -86,19 +86,19 @@ class Mpc:
     def define_cost_function(self, obstacles_cost, reverse_factor):
         # Define cost function
         Q = np.eye(self.n_states, dtype=float)
-        Q[0, 0] = 0.00005
-        Q[1, 1] = 0.05
-        Q[2, 2] = 0.05
+        Q[0, 0] = 0.5
+        Q[1, 1] = 0.5
+        Q[2, 2] = 0.5
         obj = 0
         R = np.eye(self.n_controls, dtype=float)
-        R = R * 0.01
+        R = R * 0.1
         for k in range(self.N):
             st = self.X[:, k]
             con = self.U[:, k]
             obj = obj + casadi.mtimes(casadi.mtimes((st - self.P[self.n_states:2 * self.n_states]).T, Q),
                                       (st - self.P[self.n_states:2 * self.n_states])) + casadi.mtimes(
                 casadi.mtimes(con.T, R), con) + (1 / casadi.exp(con[0])) ** reverse_factor
-        self.opti.minimize(obj + obstacles_cost)
+        self.opti.minimize(obj)
 
     def euler_integration(self):
         self.X[:, 0] = self.P[0:self.n_states]

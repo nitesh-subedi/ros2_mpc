@@ -86,12 +86,12 @@ class Mpc:
     def define_cost_function(self, obstacles_cost, reverse_factor):
         # Define cost function
         Q = np.eye(self.n_states, dtype=float)
-        Q[0, 0] = 0.5
-        Q[1, 1] = 0.5
-        Q[2, 2] = 0.5
+        Q[0, 0] = 0.1
+        Q[1, 1] = 0.1
+        Q[2, 2] = 0.005
         obj = 0
         R = np.eye(self.n_controls, dtype=float)
-        R = R * 0.1
+        R = R * 0.5
         for k in range(self.N):
             st = self.X[:, k]
             con = self.U[:, k]

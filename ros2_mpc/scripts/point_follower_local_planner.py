@@ -11,10 +11,10 @@ from ament_index_python.packages import get_package_share_directory
 import os
 
 
-def get_goal_for_mpc(path_xy, goal, pos):
+def get_goal_for_mpc(path_xy, path_heading, goal, pos):
     lookahead_dist_ = 0.2
     if np.linalg.norm(goal[:2] - pos[:2]) < lookahead_dist_:
-        goal_pose = np.array([goal[0], goal[1],goal[4]])
+        goal_pose = np.array([goal[0], goal[1], goal[4]])
     else:
         # Find the nearest point on the path that is greater than lookahead distance
         dist = np.linalg.norm(path_xy - pos[:2], axis=1)
@@ -23,7 +23,7 @@ def get_goal_for_mpc(path_xy, goal, pos):
             idx = np.argmin(dist)
         else:
             idx = idx[0]
-        goal_pose = np.append(path_xy[idx], 0.0)
+        goal_pose = np.append(path_xy[idx], path_heading[idx])
         # Add orientation to goal
         # goal_pose = np.append(goal_pose, 0.0)
     return goal_pose
@@ -52,7 +52,7 @@ class RobotController(Node):
 
     def get_path(self):
         rclpy.spin_once(self, timeout_sec=0.1)
-        return self.path_xy
+        return self.path_xy, self.path_heading
 
 
 def get_obstacles(scan_data, angles, size, resolution, pos, ori, obstacles_x, obstacles_y):
@@ -131,7 +131,7 @@ def main():
                                                  obstacles_y)
         # if time.time() - tic > REFRESH_TIME:
         #     tic = time.time()
-        path_xy = robot_controller.get_path()
+        path_xy, path_headings = robot_controller.get_path()
             # robot_controller.get_logger().info("Time taken to get path: {}".format(time.time() - tic))
         if path_xy is None:
             # time.sleep(0.1)
@@ -145,7 +145,7 @@ def main():
         # goal = get_goal_for_mpc(path_xy, goal, pos)
         robot_controller.get_logger().info("Goal: {}".format(goal))
         # goal = np.array([goal[0], goal[1], goal[4]])
-        goal = get_goal_for_mpc(path_xy, goal, pos)
+        goal = get_goal_for_mpc(path_xy, path_headings, goal, pos)
         # Get the reference trajectory
         u = mpc.perform_mpc(u0, initial_state=x0, final_state=goal, obstacles_x=x_obs_array,
                                obstacles_y=y_obs_array)

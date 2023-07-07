@@ -3,26 +3,35 @@ import numpy as np
 from ament_index_python.packages import get_package_share_directory
 import os
 import yaml
+
 # import matplotlib.pyplot as plt
 
 
 class Mpc:
     def __init__(self):
-        project_path = get_package_share_directory('ros2_mpc')
-        with open(os.path.join(project_path, 'config/params.yaml'), 'r') as file:
+        project_path = get_package_share_directory("ros2_mpc")
+        with open(os.path.join(project_path, "config/params.yaml"), "r") as file:
             params = yaml.safe_load(file)
-        self.dt = params['dt']
-        self.N = params['N']
-        self.inflation_radius = params['inflation_radius']
+        self.dt = params["dt"]
+        self.N = params["N"]
+        self.inflation_radius = params["inflation_radius"]
+        self.Q = params["Q"]
+        self.R = params["R"]
         self.opti = casadi.Opti()
 
         # Get system function 'f'
         self.f, self.n_states, self.n_controls = self.get_system_function()
 
         # Get decision variables
-        self.X, self.U, self.P, self.obstacles_x, self.obstacles_y = self.get_decision_variables(
-            costmap_size=params['costmap_size'],
-            resolution=params['resolution'])
+        (
+            self.X,
+            self.U,
+            self.P,
+            self.obstacles_x,
+            self.obstacles_y,
+        ) = self.get_decision_variables(
+            costmap_size=params["costmap_size"], resolution=params["resolution"]
+        )
 
         # Perform integration using RK4
         self.rk4()
@@ -30,9 +39,11 @@ class Mpc:
         # Perform integration using Euler
         # self.euler_integration()
 
-        obstacles_cost = self.define_obstacles_cost_function(cost_factor=params['reverse_factor'])
+        obstacles_cost = self.define_obstacles_cost_function(
+            cost_factor=params["reverse_factor"]
+        )
         # Define cost function
-        self.define_cost_function(obstacles_cost, params['cost_factor'])
+        self.define_cost_function(obstacles_cost, params["cost_factor"])
 
         # Define constraints
         self.constraints()
@@ -42,20 +53,28 @@ class Mpc:
 
         # Define solver
         opts = {"ipopt.print_level": 0, "print_time": 0}
-        self.opti.solver('ipopt', opts)
+        self.opti.solver("ipopt", opts)
         # self.opti.solver('ipopt')
 
     def define_obstacles_cost_function(self, cost_factor):
         obj = 0
         for k in range(self.N + 1):
             for i in range(self.obstacles_x.shape[0]):
-                hxy = casadi.log(((self.X[0, k] - self.obstacles_x[i]) / self.inflation_radius) ** 2 + (
-                        (self.X[1, k] - self.obstacles_y[i]) / self.inflation_radius) ** 2)
-                obj = obj + casadi.exp(cost_factor * casadi.exp(-hxy))
+                distances = casadi.sqrt(
+                    (self.X[0, k] - self.obstacles_x[i]) ** 2
+                    + (self.X[1, k] - self.obstacles_y[i]) ** 2
+                )
+                obj = obj + (1 / casadi.exp(distances)) * cost_factor
         return obj
 
-    def perform_mpc(self, u0, initial_state=np.array([0, 0, 0]), final_state=np.array([10, 10, 0]), obstacles_x=None,
-                    obstacles_y=None):
+    def perform_mpc(
+        self,
+        u0,
+        initial_state=np.array([0, 0, 0]),
+        final_state=np.array([10, 10, 0]),
+        obstacles_x=None,
+        obstacles_y=None,
+    ):
         # Set initial state and parameter value
         self.opti.set_initial(self.U, u0)
         self.opti.set_value(self.P, casadi.vertcat(initial_state, final_state))
@@ -80,35 +99,43 @@ class Mpc:
 
     def constraints(self):
         # Define constraints
-        self.opti.subject_to(self.opti.bounded(-0.2, self.U[0, :], 0.2))
-        self.opti.subject_to(self.opti.bounded(-0.1, self.U[1, :], 0.1))
+        self.opti.subject_to(self.opti.bounded(-0.05, self.U[0, :], 0.2))
+        self.opti.subject_to(self.opti.bounded(-0.2, self.U[1, :], 0.2))
 
     def define_cost_function(self, obstacles_cost, reverse_factor):
         # Define cost function
         Q = np.eye(self.n_states, dtype=float)
-        Q[0, 0] = 0.1
-        Q[1, 1] = 0.1
-        Q[2, 2] = 0.005
+        Q[0, 0] = self.Q[0]
+        Q[1, 1] = self.Q[1]
+        Q[2, 2] = self.Q[2]
         obj = 0
         R = np.eye(self.n_controls, dtype=float)
         R = R * 0.5
         for k in range(self.N):
             st = self.X[:, k]
             con = self.U[:, k]
-            obj = obj + casadi.mtimes(casadi.mtimes((st - self.P[self.n_states:2 * self.n_states]).T, Q),
-                                      (st - self.P[self.n_states:2 * self.n_states])) + casadi.mtimes(
-                casadi.mtimes(con.T, R), con) + (1 / casadi.exp(con[0])) ** reverse_factor
+            obj = (
+                obj
+                + casadi.mtimes(
+                    casadi.mtimes(
+                        (st - self.P[self.n_states : 2 * self.n_states]).T, Q
+                    ),
+                    (st - self.P[self.n_states : 2 * self.n_states]),
+                )
+                + casadi.mtimes(casadi.mtimes(con.T, R), con)
+                + (1 / casadi.exp(con[0])) ** reverse_factor
+            )
         self.opti.minimize(obj)
 
     def euler_integration(self):
-        self.X[:, 0] = self.P[0:self.n_states]
+        self.X[:, 0] = self.P[0 : self.n_states]
         for k in range(self.N):
             x_next = self.X[:, k] + self.dt * self.f(self.X[:, k], self.U[:, k])
             self.X[:, k + 1] = x_next
             # self.opti.subject_to(self.X[:, k + 1] == x_next)
 
     def rk4(self):
-        self.X[:, 0] = self.P[0:self.n_states]  # Initial State
+        self.X[:, 0] = self.P[0 : self.n_states]  # Initial State
         for k in range(self.N):
             # Define RK4 constants
             k1 = self.f(self.X[:, k], self.U[:, k])
@@ -146,5 +173,7 @@ class Mpc:
 
         # Define dynamic constraints
         rhs = casadi.vertcat(v * casadi.cos(theta), v * casadi.sin(theta), w)
-        f = casadi.Function('f', [states, controls], [rhs], ['input_state', 'control_input'], ['rhs'])
+        f = casadi.Function(
+            "f", [states, controls], [rhs], ["input_state", "control_input"], ["rhs"]
+        )
         return f, n_states, n_controls

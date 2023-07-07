@@ -80,7 +80,7 @@ class RRTGlobalPlanner:
 
 class AStarPlanner2:
     def __init__(self):
-        self.window_size = 11
+        self.window_size = 15
         self.poly_degree = 2
         pass
 
@@ -93,7 +93,10 @@ class AStarPlanner2:
         )
         x = np.array(path[:, 1])
         y = np.array(path[:, 0])
-        smoothed_y = savgol_filter(y, self.window_size, self.poly_degree, mode="nearest")
+        try:
+            smoothed_y = savgol_filter(y, self.window_size, self.poly_degree, mode="interp")
+        except ValueError:
+            smoothed_y = y
         # smooth_x = np.convolve(
         #     x, np.ones(self.window_size) / self.window_size, mode="valid"
         # ).astype(np.int32)

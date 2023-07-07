@@ -2,6 +2,7 @@ import rclpy
 from rclpy.node import Node
 from nav_msgs.msg import Path
 import numpy as np
+from geometry_msgs.msg import PointStamped
 from ros2_mpc.planner.local_planner_point_stabilization import Mpc
 from ros2_mpc.ros_topics import OdomSubscriber, CmdVelPublisher, GoalSubscriber, LaserSubscriber
 from ros2_mpc import utils
@@ -12,7 +13,7 @@ import os
 
 
 def get_goal_for_mpc(path_xy, path_heading, goal, pos):
-    lookahead_dist_ = 0.2
+    lookahead_dist_ = 0.5
     if np.linalg.norm(goal[:2] - pos[:2]) < lookahead_dist_:
         goal_pose = np.array([goal[0], goal[1], goal[4]])
     else:
@@ -29,6 +30,30 @@ def get_goal_for_mpc(path_xy, path_heading, goal, pos):
     return goal_pose
 
 
+# def orientation_error(goal_pose, pos):
+#     # Calculate orientation error
+#     goal_heading = goal_pose[2]
+#     current_heading = pos[2]
+#     orientation_error = goal_heading - current_heading
+#     if orientation_error > np.pi:
+#         orientation_error = orientation_error - 2 * np.pi
+#     elif orientation_error < -np.pi:
+#         orientation_error = orientation_error + 2
+
+
+class GoalPointPublisher(Node):
+    def __init__(self):
+        super().__init__('goal_point_publisher')
+        self.goal_point = None
+        self.publisher_ = self.create_publisher(PointStamped, 'goal_point', 10)
+    
+    def publish_goal_point(self, goal_point):
+        msg = PointStamped()
+        msg.header.frame_id = 'map'
+        msg.point.x = goal_point[0]
+        msg.point.y = goal_point[1]
+        msg.point.z = goal_point[2]
+        self.publisher_.publish(msg)
 
 class RobotController(Node):
     def __init__(self):
@@ -95,12 +120,14 @@ def main():
     cmd_vel_publisher = CmdVelPublisher()
     goal_listener = GoalSubscriber()
     laser_node = LaserSubscriber()
+    goal_point_publisher = GoalPointPublisher()
     project_path = get_package_share_directory('ros2_mpc')
     # get the goal position from the yaml file
     with open(os.path.join(project_path, 'config/params.yaml'), 'r') as file:
         params = yaml.safe_load(file)
     dt = params['dt']
     size = params['costmap_size']
+    goal_threshold = params['goal_threshold']
     resolution = params['resolution']
     obstacles_y = np.ones(int((size * 2) / resolution) * 2)
     obstacles_x = np.ones(int((size * 2) / resolution) * 2)
@@ -143,15 +170,24 @@ def main():
         if goal is None or pos is None:
             continue
         # goal = get_goal_for_mpc(path_xy, goal, pos)
-        robot_controller.get_logger().info("Goal: {}".format(goal))
+        # robot_controller.get_logger().info("Goal: {}".format(goal))
         # goal = np.array([goal[0], goal[1], goal[4]])
-        goal = get_goal_for_mpc(path_xy, path_headings, goal, pos)
+        goal_mpc = get_goal_for_mpc(path_xy, path_headings, goal, pos)
+        goal_point_publisher.publish_goal_point(goal_mpc)
+        # Calculate error in orientation
+        # error = goal_mpc[2] - x0[2]
+        # robot_controller.get_logger().info("Error: {}".format(error))
+        # if abs(error) > np.deg2rad(30):
+        #     robot_controller.get_logger().info("Rotating towards goal!")
+        #     # Identify the direction of rotation
+        #     if error > 0:
+        #         cmd_vel_publisher.publish_cmd(0.0, 0.1)
+        #     else:
+        #         cmd_vel_publisher.publish_cmd(0.0, -0.1)
+        #     continue
         # Get the reference trajectory
-        u = mpc.perform_mpc(u0, initial_state=x0, final_state=goal, obstacles_x=x_obs_array,
+        u = mpc.perform_mpc(u0, initial_state=x0, final_state=goal_mpc, obstacles_x=x_obs_array,
                                obstacles_y=y_obs_array)
-        # Publish the control
-        # if np.linalg.norm(u - u_last) > 0.1:
-        # cmd_vel_publisher.publish_cmd(u[0], u[1])
         if GOAL_FLAG:
             cmd_vel_publisher.publish_cmd(0.0, 0.0)
         else:
@@ -164,7 +200,7 @@ def main():
                 u_last = u
         # cmd_vel_publisher.publish_cmd(0.0, 0.0)
         if x0 is not None and goal is not None:
-            if np.linalg.norm(x0[0:2] - goal[0:2]) > 0.15:
+            if np.linalg.norm(x0[0:2] - goal[0:2]) > goal_threshold:
                 if GOAL_FLAG:
                     robot_controller.get_logger().info("New goal received!" + str(goal))
                     # robot_controller.get_logger().info("Thinking!")

@@ -81,7 +81,7 @@ class RRTGlobalPlanner:
 class AStarPlanner2:
     def __init__(self):
         self.window_size = 15
-        self.poly_degree = 2
+        self.poly_degree = 4 
         pass
 
     def get_path(self, start, goal, map_image):

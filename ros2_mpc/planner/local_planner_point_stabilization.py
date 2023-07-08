@@ -58,13 +58,10 @@ class Mpc:
 
     def define_obstacles_cost_function(self, cost_factor):
         obj = 0
-        for k in range(self.N + 1):
-            for i in range(self.obstacles_x.shape[0]):
-                distances = casadi.sqrt(
-                    (self.X[0, k] - self.obstacles_x[i]) ** 2
-                    + (self.X[1, k] - self.obstacles_y[i]) ** 2
-                )
-                obj = obj + (1 / casadi.exp(distances)) * cost_factor
+        for i in range(self.N):
+            for j in range(self.obstacles_x.shape[0]):
+                obj += cost_factor * casadi.exp(-((self.X[0, i] - self.obstacles_x[j]) ** 2
+                        + (self.X[1, i] - self.obstacles_y[j]) ** 2)/ self.inflation_radius**2)
         return obj
 
     def perform_mpc(
@@ -99,7 +96,7 @@ class Mpc:
 
     def constraints(self):
         # Define constraints
-        self.opti.subject_to(self.opti.bounded(-0.05, self.U[0, :], 0.2))
+        self.opti.subject_to(self.opti.bounded(-0.05, self.U[0, :], 0.15))
         self.opti.subject_to(self.opti.bounded(-0.2, self.U[1, :], 0.2))
 
     def define_cost_function(self, obstacles_cost, reverse_factor):
@@ -125,7 +122,7 @@ class Mpc:
                 + casadi.mtimes(casadi.mtimes(con.T, R), con)
                 + (1 / casadi.exp(con[0])) ** reverse_factor
             )
-        self.opti.minimize(obj)
+        self.opti.minimize(obj + obstacles_cost)
 
     def euler_integration(self):
         self.X[:, 0] = self.P[0 : self.n_states]

@@ -2,7 +2,8 @@ import rclpy
 from rclpy.node import Node
 from nav_msgs.msg import Path
 import numpy as np
-from geometry_msgs.msg import PointStamped
+from geometry_msgs.msg import PointStamped, PoseStamped
+
 from ros2_mpc.planner.local_planner_point_stabilization import Mpc
 from ros2_mpc.ros_topics import OdomSubscriber, CmdVelPublisher, GoalSubscriber, LaserSubscriber
 from ros2_mpc import utils
@@ -12,10 +13,9 @@ from ament_index_python.packages import get_package_share_directory
 import os
 
 
-def get_goal_for_mpc(path_xy, path_heading, goal, pos):
-    lookahead_dist_ = 0.5
+def get_goal_for_mpc(path_xy, path_heading, goal, pos, lookahead_dist_ = 0.5):
     if np.linalg.norm(goal[:2] - pos[:2]) < lookahead_dist_:
-        goal_pose = np.array([goal[0], goal[1], goal[4]])
+        goal_pose = np.array([goal[0], goal[1], goal[4] % (2 * np.pi)])
     else:
         # Find the nearest point on the path that is greater than lookahead distance
         dist = np.linalg.norm(path_xy - pos[:2], axis=1)
@@ -24,7 +24,7 @@ def get_goal_for_mpc(path_xy, path_heading, goal, pos):
             idx = np.argmin(dist)
         else:
             idx = idx[0]
-        goal_pose = np.append(path_xy[idx], path_heading[idx])
+        goal_pose = np.append(path_xy[idx], path_heading[idx] % (2 * np.pi))
         # Add orientation to goal
         # goal_pose = np.append(goal_pose, 0.0)
     return goal_pose
@@ -45,14 +45,18 @@ class GoalPointPublisher(Node):
     def __init__(self):
         super().__init__('goal_point_publisher')
         self.goal_point = None
-        self.publisher_ = self.create_publisher(PointStamped, 'goal_point', 10)
+        self.publisher_ = self.create_publisher(PoseStamped, 'goal_point', 10)
     
     def publish_goal_point(self, goal_point):
-        msg = PointStamped()
+        msg = PoseStamped()
         msg.header.frame_id = 'map'
-        msg.point.x = goal_point[0]
-        msg.point.y = goal_point[1]
-        msg.point.z = goal_point[2]
+        msg.pose.position.x = goal_point[0]
+        msg.pose.position.y = goal_point[1]
+        msg.pose.position.z = 0.0
+        msg.pose.orientation.x = 0.0
+        msg.pose.orientation.y = 0.0
+        msg.pose.orientation.z = np.sin(goal_point[2] / 2)
+        msg.pose.orientation.w = np.cos(goal_point[2] / 2)
         self.publisher_.publish(msg)
 
 class RobotController(Node):
@@ -164,7 +168,7 @@ def main():
             # time.sleep(0.1)
             continue
         # Define initial state
-        x0 = np.array([pos[0], pos[1], ori[2]])
+        x0 = np.array([pos[0], pos[1], ori[2] % (2 * np.pi)])
         # Define initial control
         u0 = np.zeros((mpc.n_controls, mpc.N))
         if goal is None or pos is None:
@@ -172,7 +176,7 @@ def main():
         # goal = get_goal_for_mpc(path_xy, goal, pos)
         # robot_controller.get_logger().info("Goal: {}".format(goal))
         # goal = np.array([goal[0], goal[1], goal[4]])
-        goal_mpc = get_goal_for_mpc(path_xy, path_headings, goal, pos)
+        goal_mpc = get_goal_for_mpc(path_xy, path_headings, goal, pos, params['look_ahead_distance'])
         goal_point_publisher.publish_goal_point(goal_mpc)
         # Calculate error in orientation
         # error = goal_mpc[2] - x0[2]
@@ -211,6 +215,16 @@ def main():
                 if not GOAL_FLAG:
                     cmd_vel_publisher.publish_cmd(0.0, 0.0)
                     robot_controller.get_logger().info("Goal reached!")
+                    # Calculate error in orientation
+                    # error = goal_mpc[2] - x0[2]
+                    # if abs(error) > np.deg2rad(30):
+                    #     robot_controller.get_logger().info("Rotating towards goal!")
+                    #     # Identify the direction of rotation
+                    #     if error > 0:
+                    #         cmd_vel_publisher.publish_cmd(0.0, 0.1)
+                    #     else:
+                    #         cmd_vel_publisher.publish_cmd(0.0, -0.1)
+                    #     continue
                     robot_controller.get_logger().info("Waiting for goal!")
                     cmd_vel_publisher.publish_cmd(0.0, 0.0)
                     GOAL_FLAG = True

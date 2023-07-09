@@ -3,9 +3,9 @@ N: 30
 Q: [1.0, 1.0, 0.005]
 R: [1.0, 1.0]
 resolution: 0.05
-cost_factor: 50.0
+cost_factor: 0.5
 costmap_size: 2.0
-inflation_radius: 0.3
+inflation_radius: 0.2
 reverse_factor: 5.0
 rotation_factor: 2.0
 look_ahead_distance: 0.5

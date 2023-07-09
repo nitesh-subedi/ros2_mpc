@@ -4,6 +4,7 @@ from ament_index_python.packages import get_package_share_directory
 import os
 import yaml
 
+
 # import matplotlib.pyplot as plt
 
 
@@ -61,16 +62,17 @@ class Mpc:
         for i in range(self.N):
             for j in range(self.obstacles_x.shape[0]):
                 obj += cost_factor * casadi.exp(-((self.X[0, i] - self.obstacles_x[j]) ** 2
-                        + (self.X[1, i] - self.obstacles_y[j]) ** 2)/ self.inflation_radius**2)
+                                                  + (self.X[1, i] - self.obstacles_y[
+                            j]) ** 2) / self.inflation_radius ** 2)
         return obj
 
     def perform_mpc(
-        self,
-        u0,
-        initial_state=np.array([0, 0, 0]),
-        final_state=np.array([10, 10, 0]),
-        obstacles_x=None,
-        obstacles_y=None,
+            self,
+            u0,
+            initial_state=np.array([0, 0, 0]),
+            final_state=np.array([10, 10, 0]),
+            obstacles_x=None,
+            obstacles_y=None,
     ):
         # Set initial state and parameter value
         self.opti.set_initial(self.U, u0)
@@ -112,27 +114,27 @@ class Mpc:
             st = self.X[:, k]
             con = self.U[:, k]
             obj = (
-                obj
-                + casadi.mtimes(
-                    casadi.mtimes(
-                        (st - self.P[self.n_states : 2 * self.n_states]).T, Q
-                    ),
-                    (st - self.P[self.n_states : 2 * self.n_states]),
-                )
-                + casadi.mtimes(casadi.mtimes(con.T, R), con)
-                + (1 / casadi.exp(con[0])) ** reverse_factor
+                    obj
+                    + casadi.mtimes(
+                casadi.mtimes(
+                    (st - self.P[self.n_states: 2 * self.n_states]).T, Q
+                ),
+                (st - self.P[self.n_states: 2 * self.n_states]),
+            )
+                    + casadi.mtimes(casadi.mtimes(con.T, R), con)
+                    + (1 / casadi.exp(con[0])) ** reverse_factor
             )
         self.opti.minimize(obj + obstacles_cost)
 
     def euler_integration(self):
-        self.X[:, 0] = self.P[0 : self.n_states]
+        self.X[:, 0] = self.P[0: self.n_states]
         for k in range(self.N):
             x_next = self.X[:, k] + self.dt * self.f(self.X[:, k], self.U[:, k])
             self.X[:, k + 1] = x_next
             # self.opti.subject_to(self.X[:, k + 1] == x_next)
 
     def rk4(self):
-        self.X[:, 0] = self.P[0 : self.n_states]  # Initial State
+        self.X[:, 0] = self.P[0: self.n_states]  # Initial State
         for k in range(self.N):
             # Define RK4 constants
             k1 = self.f(self.X[:, k], self.U[:, k])

@@ -13,7 +13,7 @@ from ament_index_python.packages import get_package_share_directory
 import os
 
 
-def get_goal_for_mpc(path_xy, path_heading, goal, pos, lookahead_dist_ = 0.5):
+def get_goal_for_mpc(path_xy, path_heading, goal, pos, lookahead_dist_=0.5):
     if np.linalg.norm(goal[:2] - pos[:2]) < lookahead_dist_:
         goal_pose = np.array([goal[0], goal[1], goal[4] % (2 * np.pi)])
     else:
@@ -46,7 +46,7 @@ class GoalPointPublisher(Node):
         super().__init__('goal_point_publisher')
         self.goal_point = None
         self.publisher_ = self.create_publisher(PoseStamped, 'goal_point', 10)
-    
+
     def publish_goal_point(self, goal_point):
         msg = PoseStamped()
         msg.header.frame_id = 'map'
@@ -58,6 +58,7 @@ class GoalPointPublisher(Node):
         msg.pose.orientation.z = np.sin(goal_point[2] / 2)
         msg.pose.orientation.w = np.cos(goal_point[2] / 2)
         self.publisher_.publish(msg)
+
 
 class RobotController(Node):
     def __init__(self):
@@ -85,7 +86,7 @@ class RobotController(Node):
 
 
 def get_obstacles(scan_data, angles, size, resolution, pos, ori, obstacles_x, obstacles_y):
-    occ_grid = 1 - utils.convert_laser_scan_to_occupancy_grid(scan_data, angles, resolution, size * 2)
+    occ_grid = 1 - (utils.convert_laser_scan_to_occupancy_grid(scan_data, angles, resolution, size * 2) / 100)
     occ_grid = np.rot90(occ_grid, k=2)
     x, y = utils.convert_to_map_coordinates(occ_grid=occ_grid, map_resolution=resolution)
     # print(time.time() - tic)
@@ -163,7 +164,7 @@ def main():
         # if time.time() - tic > REFRESH_TIME:
         #     tic = time.time()
         path_xy, path_headings = robot_controller.get_path()
-            # robot_controller.get_logger().info("Time taken to get path: {}".format(time.time() - tic))
+        # robot_controller.get_logger().info("Time taken to get path: {}".format(time.time() - tic))
         if path_xy is None:
             # time.sleep(0.1)
             continue
@@ -191,7 +192,7 @@ def main():
         #     continue
         # Get the reference trajectory
         u = mpc.perform_mpc(u0, initial_state=x0, final_state=goal_mpc, obstacles_x=x_obs_array,
-                               obstacles_y=y_obs_array)
+                            obstacles_y=y_obs_array)
         if GOAL_FLAG:
             cmd_vel_publisher.publish_cmd(0.0, 0.0)
         else:

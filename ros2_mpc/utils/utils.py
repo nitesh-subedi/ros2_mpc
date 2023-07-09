@@ -3,7 +3,7 @@ from numba import njit
 
 
 @njit
-def convert_laser_scan_to_occupancy_grid(laser_scan_data, angles, map_resolution, map_size):
+def convert_laser_scan_to_occupancy_grid(laser_scan_data, angles, map_resolution, map_size, rotation=0.0):
     # Calculate the size of each cell in the occupancy grid
     cell_size = map_resolution
     angle_min = angles[0]
@@ -13,23 +13,106 @@ def convert_laser_scan_to_occupancy_grid(laser_scan_data, angles, map_resolution
     num_cells = int(map_size / cell_size)
 
     # Create an empty occupancy grid
-    occupancy_grid = np.zeros((int(num_cells), int(num_cells)))
+    occupancy_grid = np.zeros((num_cells, num_cells))
 
     # Convert laser scan data to Cartesian coordinates
     angles = np.arange(len(laser_scan_data)) * (angle_max - angle_min) / len(laser_scan_data) + angle_min
     x_coords = laser_scan_data * np.cos(angles)
     y_coords = laser_scan_data * np.sin(angles)
+    # print(type(x_coords))
+    coordinates = np.vstack((x_coords, y_coords))
+    coordinates_rotated = rotate_coordinates(coordinates, rotation)
+    x_coords = coordinates_rotated[0, :]
+    y_coords = coordinates_rotated[1, :]
+    # Convert nan values to 0
+    x_coords[np.isnan(x_coords)] = 0
+    y_coords[np.isnan(y_coords)] = 0
+    # Convert inf values to max range
+    x_coords[np.isinf(x_coords)] = np.max(x_coords[~np.isinf(x_coords)])
+    y_coords[np.isinf(y_coords)] = np.max(y_coords[~np.isinf(y_coords)])
 
     x_indices = (x_coords + (map_size / 2))
     y_indices = (y_coords + (map_size / 2))
 
     # Set occupied cells in the occupancy grid
     for i in range(len(x_indices)):
-        x, y = x_indices[i], y_indices[i]
+        x, y = int(x_indices[i] / cell_size), int(y_indices[i] / cell_size)
         if 0 <= x < num_cells and 0 <= y < num_cells:
-            occupancy_grid[int(x), int(y)] = 1
+            occupancy_grid[int(y), int(x)] = 100
 
     return occupancy_grid
+
+
+@njit
+def convert_laser_scan_to_xy_coordinates(laser_scan_data, angles, rotation=0.0):
+    # Calculate the size of each cell in the occupancy grid
+    angle_min = angles[0]
+    angle_max = angles[1]
+
+    # Convert laser scan data to Cartesian coordinates
+    angles = np.arange(len(laser_scan_data)) * (angle_max - angle_min) / len(laser_scan_data) + angle_min
+    x_coords = laser_scan_data * np.cos(angles)
+    y_coords = laser_scan_data * np.sin(angles)
+    # print(type(x_coords))
+    coordinates = np.vstack((x_coords, y_coords))
+    coordinates_rotated = rotate_coordinates(coordinates, rotation)
+    x_coords = coordinates_rotated[0, :]
+    y_coords = coordinates_rotated[1, :]
+    # Convert nan values to 0
+    x_coords[np.isnan(x_coords)] = 0
+    y_coords[np.isnan(y_coords)] = 0
+    # Convert inf values to max range
+    x_coords[np.isinf(x_coords)] = np.max(x_coords[~np.isinf(x_coords)])
+    y_coords[np.isinf(y_coords)] = np.max(y_coords[~np.isinf(y_coords)])
+
+    return x_coords, y_coords
+
+
+# @njit
+def convert_xy_coordinates_to_occ_grid(x_coords, y_coords, map_resolution, map_size):
+    # Calculate the size of each cell in the occupancy grid
+    cell_size = map_resolution
+
+    # Calculate the number of cells in the occupancy grid
+    map_size_x = map_size[0] * map_resolution
+    map_size_y = map_size[1] * map_resolution
+    num_cells_x = int(map_size_x / cell_size)
+    num_cells_y = int(map_size_y / cell_size)
+
+    # Create an empty occupancy grid
+    occupancy_grid = np.zeros((num_cells_x, num_cells_y))
+
+    x_indices = x_coords
+    y_indices = y_coords
+
+    # Set occupied cells in the occupancy grid
+    for i in range(len(x_indices)):
+        x, y = int(x_indices[i] / cell_size), int(y_indices[i] / cell_size)
+        if 0 <= x < num_cells_x and 0 <= y < num_cells_y:
+            occupancy_grid[int(x), int(y)] = 100
+
+    return occupancy_grid
+
+
+# @njit
+def convert_occ_grid_to_xy_coordinates(occ_grid, map_info):
+    occ_grid = np.flipud(occ_grid)
+    # Calculate the number of cells in the occupancy grid
+    map_resolution = map_info['resolution']
+    map_origin = np.array([map_info['origin'][0], map_info['origin'][1]])
+    num_cells_x = int(occ_grid.shape[0])
+    num_cells_y = int(occ_grid.shape[1])
+
+    # Create an empty occupancy grid
+    x_coords = []
+    y_coords = []
+    for i in range(num_cells_x):
+        for j in range(num_cells_y):
+            if occ_grid[i, j] == 255:
+                x_coords.append(j * map_resolution + map_origin[0])
+                y_coords.append(i * map_resolution + map_origin[1])
+
+    return x_coords, y_coords
 
 
 @njit

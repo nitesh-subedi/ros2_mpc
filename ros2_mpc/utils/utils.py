@@ -68,38 +68,34 @@ def convert_laser_scan_to_xy_coordinates(laser_scan_data, angles, rotation=0.0):
     return x_coords, y_coords
 
 
-# @njit
-def convert_xy_coordinates_to_occ_grid(x_coords, y_coords, map_resolution, map_size):
+@njit
+def convert_xy_coordinates_to_occ_grid(x_coords, y_coords, map_size, map_resolution, map_origin):
     # Calculate the size of each cell in the occupancy grid
     cell_size = map_resolution
-
     # Calculate the number of cells in the occupancy grid
-    map_size_x = map_size[0] * map_resolution
-    map_size_y = map_size[1] * map_resolution
-    num_cells_x = int(map_size_x / cell_size)
-    num_cells_y = int(map_size_y / cell_size)
+    num_cells_x = map_size[0]
+    num_cells_y = map_size[1]
 
     # Create an empty occupancy grid
     occupancy_grid = np.zeros((num_cells_x, num_cells_y))
 
-    x_indices = x_coords
-    y_indices = y_coords
+    # Convert laser scan data to Cartesian coordinates
+    x_indices = (x_coords - map_origin[0]) / cell_size
+    y_indices = (y_coords - map_origin[1]) / cell_size
 
     # Set occupied cells in the occupancy grid
     for i in range(len(x_indices)):
-        x, y = int(x_indices[i] / cell_size), int(y_indices[i] / cell_size)
+        x, y = int(x_indices[i]), int(y_indices[i])
         if 0 <= x < num_cells_x and 0 <= y < num_cells_y:
-            occupancy_grid[int(x), int(y)] = 100
+            occupancy_grid[int(y), int(x)] = 100
 
     return occupancy_grid
 
 
-# @njit
-def convert_occ_grid_to_xy_coordinates(occ_grid, map_info):
+@njit
+def convert_occ_grid_to_xy_coordinates(occ_grid, map_resolution, map_origin):
     occ_grid = np.flipud(occ_grid)
     # Calculate the number of cells in the occupancy grid
-    map_resolution = map_info['resolution']
-    map_origin = np.array([map_info['origin'][0], map_info['origin'][1]])
     num_cells_x = int(occ_grid.shape[0])
     num_cells_y = int(occ_grid.shape[1])
 

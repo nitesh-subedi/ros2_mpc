@@ -20,7 +20,7 @@ def generate_launch_description():
         package='ros2_mpc',
         executable='path_publisher',
         output='screen',
-        arguments=['--ros-args', '--log-level', 'INFO']#,
+        arguments=['--ros-args', '--log-level', 'INFO']  # ,
         # parameters=[{'use_sim_time': True}]
     )
 
@@ -31,11 +31,25 @@ def generate_launch_description():
         arguments=['--ros-args', '--log-level', 'INFO']
     )
 
+    global_costmap_publisher_node = Node(
+        package='ros2_mpc',
+        executable='global_costmap_publisher',
+        output='screen',
+        arguments=['--ros-args', '--log-level', 'INFO']
+    )
+
+    local_costmap_publisher_node = Node(
+        package='ros2_mpc',
+        executable='local_costmap_publisher',
+        output='screen',
+        arguments=['--ros-args', '--log-level', 'INFO']
+    )
+
     rviz_node = Node(
-            package='rviz2',
-            executable='rviz2',
-            name='rviz2',
-            arguments=['-d', rviz_config_dir]
+        package='rviz2',
+        executable='rviz2',
+        name='rviz2',
+        arguments=['-d', rviz_config_dir]
     )
 
     # Create the launch description and populate
@@ -44,5 +58,7 @@ def generate_launch_description():
     ld.add_action(path_subscriber_local_planner_node)
     ld.add_action(path_publisher_node)
     ld.add_action(robot_state_publisher_node)
+    ld.add_action(global_costmap_publisher_node)
+    ld.add_action(local_costmap_publisher_node)
     ld.add_action(rviz_node)
     return ld

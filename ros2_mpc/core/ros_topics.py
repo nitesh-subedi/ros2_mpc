@@ -152,7 +152,7 @@ class LocalCostmapPublisher(Node):
         self.msg.info.resolution = 0.05
         self.msg.data = costmap.flatten().tolist()
         self.publisher.publish(self.msg)
-        self.get_logger().info("Costmap Published!")
+        # self.get_logger().info("Local Costmap Published!")
 
 
 class GlobalCostmapPublisher(Node):
@@ -171,4 +171,4 @@ class GlobalCostmapPublisher(Node):
         self.msg.info.resolution = 0.05
         self.msg.data = costmap.flatten().tolist()
         self.publisher.publish(self.msg)
-        self.get_logger().info("Costmap Published!")
+        self.get_logger().info("Global Costmap Published!")

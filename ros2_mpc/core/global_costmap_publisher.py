@@ -1,7 +1,6 @@
-import time
 import numpy as np
 from ros2_mpc import utils
-from ros2_mpc.ros_topics import OdomSubscriber, GlobalCostmapPublisher, LaserSubscriber, MapSubscriber
+from ros2_mpc.core.ros_topics import OdomSubscriber, GlobalCostmapPublisher, LaserSubscriber, MapSubscriber
 import cv2
 import rclpy
 

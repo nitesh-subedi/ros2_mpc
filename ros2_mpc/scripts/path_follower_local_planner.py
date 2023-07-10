@@ -3,7 +3,7 @@ from rclpy.node import Node
 from nav_msgs.msg import Path
 import numpy as np
 from ros2_mpc.planner.local_planner_tracking import Mpc
-from ros2_mpc.ros_topics import OdomSubscriber, CmdVelPublisher, GoalSubscriber, LaserSubscriber
+from ros2_mpc.core.ros_topics import OdomSubscriber, CmdVelPublisher, GoalSubscriber, LaserSubscriber
 from ros2_mpc import utils
 import time
 import yaml

@@ -2,15 +2,12 @@ import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import PoseStamped
 from nav_msgs.msg import Path
-from ros2_mpc.planner.global_planner import AstarGlobalPlanner, RRTGlobalPlanner, AStarPlanner2
+from ros2_mpc.planner.global_planner import AStarPlanner2
 import numpy as np
-from ros2_mpc.ros_topics import OdomSubscriber, MapSubscriber, GoalSubscriber
+from ros2_mpc.core.ros_topics import OdomSubscriber, MapSubscriber, GoalSubscriber
 from ros2_mpc import utils
 import cv2
-import time
-import yaml
 from ament_index_python.packages import get_package_share_directory
-import os
 
 
 def get_headings(path_xy):

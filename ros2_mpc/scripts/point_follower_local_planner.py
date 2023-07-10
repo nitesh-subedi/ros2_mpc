@@ -2,10 +2,10 @@ import rclpy
 from rclpy.node import Node
 from nav_msgs.msg import Path
 import numpy as np
-from geometry_msgs.msg import PointStamped, PoseStamped
+from geometry_msgs.msg import PoseStamped
 
 from ros2_mpc.planner.local_planner_point_stabilization import Mpc
-from ros2_mpc.ros_topics import OdomSubscriber, CmdVelPublisher, GoalSubscriber, LaserSubscriber
+from ros2_mpc.core.ros_topics import OdomSubscriber, CmdVelPublisher, GoalSubscriber, LaserSubscriber
 from ros2_mpc import utils
 import time
 import yaml

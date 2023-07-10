@@ -124,7 +124,7 @@ class Mpc:
                     + casadi.mtimes(casadi.mtimes(con.T, R), con)
                     + (1 / casadi.exp(con[0])) ** reverse_factor
             )
-        self.opti.minimize(obj + obstacles_cost)
+        self.opti.minimize(obj)
 
     def euler_integration(self):
         self.X[:, 0] = self.P[0: self.n_states]

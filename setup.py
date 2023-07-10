@@ -29,6 +29,8 @@ setup(
             'local_planner = ros2_mpc.scripts.path_follower_local_planner:main',
             'local_point_follower = ros2_mpc.scripts.point_follower_local_planner:main',
             'robot_state_publisher = ros2_mpc.core.robot_state_publisher:main',
+            'global_costmap_publisher = ros2_mpc.core.global_costmap_publisher:main',
+            'local_costmap_publisher = ros2_mpc.core.local_costmap_publisher:main',
         ],
     },
 )

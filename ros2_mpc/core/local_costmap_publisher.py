@@ -1,7 +1,7 @@
 import time
 import numpy as np
 from ros2_mpc.utils import convert_laser_scan_to_occupancy_grid
-from ros2_mpc.ros_topics import OdomSubscriber, LocalCostmapPublisher, LaserSubscriber
+from ros2_mpc.core.ros_topics import OdomSubscriber, LocalCostmapPublisher, LaserSubscriber
 import cv2
 import rclpy
 import os

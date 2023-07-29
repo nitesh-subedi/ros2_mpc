@@ -172,3 +172,23 @@ class GlobalCostmapPublisher(Node):
         self.msg.data = costmap.flatten().tolist()
         self.publisher.publish(self.msg)
         self.get_logger().info("Global Costmap Published!")
+
+
+class MapServer(Node):
+    def __init__(self):
+        super().__init__("map_server")
+        self.msg = None
+        self.publisher = self.create_publisher(OccupancyGrid, "/map", 10)
+
+    def publish_map(self, map_image, map_info):
+        self.msg = OccupancyGrid()
+        self.msg.header.stamp = self.get_clock().now().to_msg()
+        self.msg.header.frame_id = "map"
+        self.msg.info.width = map_image.shape[1]
+        self.msg.info.height = map_image.shape[0]
+        self.msg.info.origin.position.x = map_info['origin'][0]
+        self.msg.info.origin.position.y = map_info['origin'][1]
+        self.msg.info.resolution = map_info['resolution']
+        self.msg.data = map_image.flatten().tolist()
+        self.publisher.publish(self.msg)
+        self.get_logger().info("Map Published!")

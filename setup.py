@@ -14,7 +14,9 @@ setup(
         ('share/' + package_name, ['package.xml']),
         ('share/' + package_name + '/config', ['config/params.yaml']),
         ('share/' + package_name + '/config', ['config/rviz_config.rviz']),
-        (os.path.join('share', package_name, 'launch'), glob(os.path.join('launch', '*launch.[pxy][yma]*')))
+        (os.path.join('share', package_name, 'launch'), glob(os.path.join('launch', '*launch.[pxy][yma]*'))),
+        # Add map files
+        (os.path.join('share', package_name, 'maps'), glob(os.path.join('maps', '*.*')))
 
     ],
     install_requires=['setuptools'],
@@ -31,6 +33,7 @@ setup(
             'robot_state_publisher = ros2_mpc.core.robot_state_publisher:main',
             'global_costmap_publisher = ros2_mpc.core.global_costmap_publisher:main',
             'local_costmap_publisher = ros2_mpc.core.local_costmap_publisher:main',
+            'map_server = ros2_mpc.core.map_server:main',
         ],
     },
 )

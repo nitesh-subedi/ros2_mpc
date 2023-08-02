@@ -34,6 +34,7 @@ setup(
             'global_costmap_publisher = ros2_mpc.core.global_costmap_publisher:main',
             'local_costmap_publisher = ros2_mpc.core.local_costmap_publisher:main',
             'map_server = ros2_mpc.core.map_server:main',
+            'map_odom_tf_publisher = ros2_mpc.core.transform_publisher:main',
         ],
     },
 )

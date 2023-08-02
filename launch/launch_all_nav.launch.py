@@ -14,42 +14,56 @@ def generate_launch_description():
         executable='local_point_follower',
         output='screen',
         remappings=[('/cmd_vel', '/cmd_vel'), ('/odom', '/odom'), ('/path', '/path')],
-        arguments=['--ros-args', '--log-level', 'INFO']
+        arguments=['--ros-args', '--log-level', 'INFO'],
+        parameters=[{'use_sim_time': True}]
+
     )
     path_publisher_node = Node(
         package='ros2_mpc',
         executable='path_publisher',
         output='screen',
-        arguments=['--ros-args', '--log-level', 'INFO']  # ,
-        # parameters=[{'use_sim_time': True}]
+        arguments=['--ros-args', '--log-level', 'INFO'],
+        parameters=[{'use_sim_time': True}]
     )
 
     robot_state_publisher_node = Node(
         package='ros2_mpc',
         executable='robot_state_publisher',
         output='screen',
-        arguments=['--ros-args', '--log-level', 'INFO']
+        arguments=['--ros-args', '--log-level', 'INFO'],
+        parameters=[{'use_sim_time': True}]
     )
 
     global_costmap_publisher_node = Node(
         package='ros2_mpc',
         executable='global_costmap_publisher',
         output='screen',
-        arguments=['--ros-args', '--log-level', 'INFO']
+        arguments=['--ros-args', '--log-level', 'INFO'],
+        parameters=[{'use_sim_time': True}]
     )
 
     local_costmap_publisher_node = Node(
         package='ros2_mpc',
         executable='local_costmap_publisher',
         output='screen',
-        arguments=['--ros-args', '--log-level', 'INFO']
+        arguments=['--ros-args', '--log-level', 'INFO'],
+        parameters=[{'use_sim_time': True}]
     )
 
     map_server_node = Node(
         package='ros2_mpc',
         executable='map_server',
         output='screen',
-        arguments=['--ros-args', '--log-level', 'INFO']
+        arguments=['--ros-args', '--log-level', 'INFO'],
+        parameters=[{'use_sim_time': True}]
+    )
+
+    map_tf_node = Node(
+        package='ros2_mpc',
+        executable='map_odom_tf_publisher',
+        output='screen',
+        arguments=['--ros-args', '--log-level', 'INFO'],
+        parameters=[{'use_sim_time': True}]
     )
 
     rviz_node = Node(
@@ -67,6 +81,7 @@ def generate_launch_description():
     ld.add_action(robot_state_publisher_node)
     ld.add_action(global_costmap_publisher_node)
     ld.add_action(local_costmap_publisher_node)
-    # ld.add_action(map_server_node)
+    ld.add_action(map_server_node)
+    ld.add_action(map_tf_node)
     ld.add_action(rviz_node)
     return ld

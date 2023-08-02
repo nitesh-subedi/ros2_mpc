@@ -26,11 +26,11 @@ def main():
     last_count = str("0")
     while rclpy.ok():
         time.sleep(0.2)
-    #     map_server.get_logger().info("Subscriptions to map:"+str(map_server.publisher.get_subscription_count()))
-    #     if str(map_server.publisher.get_subscription_count()) != last_count \
-    #             and map_server.publisher.get_subscription_count() > 0:
-        map_server.publish_map(map_image, map_info)
-            # last_count = str(map_server.publisher.get_subscription_count())
+        if str(map_server.publisher.get_subscription_count()) != last_count \
+                and map_server.publisher.get_subscription_count() > 0:
+            map_server.get_logger().info("Subscriptions to map:" + str(map_server.publisher.get_subscription_count()))
+            map_server.publish_map(map_image, map_info)
+            last_count = str(map_server.publisher.get_subscription_count())
 
 
 if __name__ == "__main__":

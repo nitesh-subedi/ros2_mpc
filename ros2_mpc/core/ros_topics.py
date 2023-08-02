@@ -138,7 +138,7 @@ class GoalSubscriber(Node):
 
 class LocalCostmapPublisher(Node):
     def __init__(self):
-        super().__init__("costmap_publisher")
+        super().__init__("local_costmap_publisher")
         self.publisher = self.create_publisher(OccupancyGrid, "/my_local_costmap", 10)
         self.msg = OccupancyGrid()
 
@@ -157,7 +157,7 @@ class LocalCostmapPublisher(Node):
 
 class GlobalCostmapPublisher(Node):
     def __init__(self):
-        super().__init__("costmap_publisher")
+        super().__init__("global_costmap_publisher")
         self.publisher = self.create_publisher(OccupancyGrid, "/my_global_costmap", 10)
         self.msg = OccupancyGrid()
 
@@ -171,7 +171,7 @@ class GlobalCostmapPublisher(Node):
         self.msg.info.resolution = 0.05
         self.msg.data = costmap.flatten().tolist()
         self.publisher.publish(self.msg)
-        self.get_logger().info("Global Costmap Published!")
+        # self.get_logger().info("Global Costmap Published!")
 
 
 class MapServer(Node):

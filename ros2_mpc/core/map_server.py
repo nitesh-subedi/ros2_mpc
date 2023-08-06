@@ -1,8 +1,6 @@
 import time
-
 import numpy as np
 import rclpy
-from rclpy.node import Node
 from ros2_mpc.core.ros_topics import MapServer
 from ament_index_python.packages import get_package_share_directory
 import cv2

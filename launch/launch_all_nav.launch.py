@@ -79,7 +79,7 @@ def generate_launch_description():
     ld.add_action(path_subscriber_local_planner_node)
     ld.add_action(path_publisher_node)
     ld.add_action(robot_state_publisher_node)
-    ld.add_action(global_costmap_publisher_node)
+    # ld.add_action(global_costmap_publisher_node)
     ld.add_action(local_costmap_publisher_node)
     ld.add_action(map_server_node)
     ld.add_action(map_tf_node)

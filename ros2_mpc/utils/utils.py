@@ -59,8 +59,8 @@ def convert_laser_scan_to_xy_coordinates(laser_scan_data, angles, rotation=0.0):
     x_coords = coordinates_rotated[0, :]
     y_coords = coordinates_rotated[1, :]
     # Convert nan values to 0
-    x_coords[np.isnan(x_coords)] = 0
-    y_coords[np.isnan(y_coords)] = 0
+    x_coords[np.isnan(x_coords)] = np.min(x_coords)
+    y_coords[np.isnan(y_coords)] = np.min(y_coords)
     # Convert inf values to max range
     x_coords[np.isinf(x_coords)] = np.max(x_coords[~np.isinf(x_coords)])
     y_coords[np.isinf(y_coords)] = np.max(y_coords[~np.isinf(y_coords)])

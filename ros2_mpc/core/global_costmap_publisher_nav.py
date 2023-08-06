@@ -1,9 +1,11 @@
-import matplotlib.pyplot as plt
 import numpy as np
 from ros2_mpc import utils
-from ros2_mpc.core.ros_topics import OdomSubscriber, GlobalCostmapPublisher, LaserSubscriber, MapSubscriber
+from ros2_mpc.core.ros_topics import OdomSubscriber, GlobalCostmapPublisher, LaserSubscriber
 import cv2
 import rclpy
+import os
+from ament_index_python.packages import get_package_share_directory
+import yaml
 
 
 def main():
@@ -11,7 +13,6 @@ def main():
     scan_subscriber = LaserSubscriber()
     odom_subscriber = OdomSubscriber()
     costmap_publisher = GlobalCostmapPublisher()
-    map_subscriber = MapSubscriber()
     while True:
         scan, angles = scan_subscriber.get_scan()
         if scan is None:
@@ -19,9 +20,20 @@ def main():
         position, orientation = odom_subscriber.get_states()
         if position is None:
             continue
-        global_map_image, map_info = map_subscriber.get_map()
-        if global_map_image is None:
-            continue
+        with open(os.path.join(get_package_share_directory('ros2_mpc'), 'maps', 'map_carto.yaml'), 'r') as f:
+            map_yaml = yaml.safe_load(f)
+        map_info = {'origin': [map_yaml['origin'][0], map_yaml['origin'][1]], 'resolution': map_yaml['resolution']}
+        map_name = map_yaml['image']
+        map_image = cv2.imread(os.path.join(get_package_share_directory('ros2_mpc'), 'maps', map_name))
+        map_image = cv2.cvtColor(map_image, cv2.COLOR_BGR2GRAY)
+        map_image[map_image == 0] = 255
+        map_image[map_image == 254] = 0
+        map_image[map_image == 205] = 0
+        map_image = np.array(map_image).astype(np.int8)
+        global_map_image = np.flipud(map_image)
+        # global_map_image, map_info = map_subscriber.get_map()
+        # if global_map_image is None:
+        #     continue
         # Convert scan data to xy coordinates
         x_scan, y_scan = utils.convert_laser_scan_to_xy_coordinates(scan, angles, rotation=orientation[2])
         # Add the robot position to the xy coordinates
@@ -37,9 +49,6 @@ def main():
         occupancy_grid = utils.convert_xy_coordinates_to_occ_grid(x, y, map_size=np.array(global_map_image.shape),
                                                                   map_resolution=map_info['resolution'],
                                                                   map_origin=map_info['origin'])
-        cv2.imshow('global_costmap', occupancy_grid)
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
         # Inflate the occupancy grid by 5 cells
         inflation_matrix = np.ones((10, 10))
         inflated_grid = cv2.dilate(occupancy_grid, inflation_matrix, iterations=1).astype(np.uint8)

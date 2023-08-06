@@ -32,6 +32,7 @@ setup(
             'local_point_follower = ros2_mpc.scripts.point_follower_local_planner:main',
             'robot_state_publisher = ros2_mpc.core.robot_state_publisher:main',
             'global_costmap_publisher = ros2_mpc.core.global_costmap_publisher:main',
+            'global_costmap_publisher_nav = ros2_mpc.core.global_costmap_publisher_nav:main',
             'local_costmap_publisher = ros2_mpc.core.local_costmap_publisher:main',
             'map_server = ros2_mpc.core.map_server:main',
             'map_odom_tf_publisher = ros2_mpc.core.transform_publisher:main',
